@@ -105,6 +105,7 @@ export const D = {
   ],
   callLockChanged: [S("C'est quoi comme serrure, maintenant ? …Essaie tes clés. Mais traîne pas devant. J'ai l'impression qu'elle aime pas qu'on attende.", "direct")],
   callLockFailed: [S("Elle bouge quand t'attends… Viens direct. Tu marches, tu t'arrêtes pas, et tu essaies tout de suite.", "direct")],
+  callFreed: [S("…je peux plus me lever, Farid… mes jambes… porte-moi…", "direct")],
   callCarrying: [S("…la musique… suis celle qu'on connaît… c'est par là qu'on sort…", "direct")],
 
   lockFailedFirst: [S("Farid ?! Je l'entends cliqueter, elle a encore changé ! …Elle bouge quand t'attends. Viens direct. Tu marches, tu t'arrêtes pas, et tu essaies tout de suite.", "direct")],

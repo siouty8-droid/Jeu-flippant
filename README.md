@@ -10,7 +10,7 @@ Jeu d'horreur à la première personne en Babylon.js. Supermarché « Bellevue �
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm run build    # vérification TypeScript + build de prod dans dist/
+npm run build    # vérification TypeScript + build de prod dans dist/ (~400 Ko de JS compressé)
 npm test         # tests Vitest (occlusion, réagencement, client, caméras, portes, timeline, radio, énigmes, fins)
 ```
 
@@ -31,10 +31,11 @@ npm test         # tests Vitest (occlusion, réagencement, client, caméras, por
 | `[` / `]` (debug ouvert) | reculer / avancer l'horloge de 15 min |
 | R (debug ouvert) | forcer un échange de deux rayons cachés |
 | J (debug ouvert) | mettre le client à l'arrêt 9 m devant toi (néons orange ; cours pour le réveiller) |
+| 1 à 6 (debug ouvert) | sauter à 00:55, 01:12, 02:28, 03:58, 04:58, 05:55 |
 | K (debug ouvert) | recevoir le double de la clé (la serrure de la chambre froide change dès que tu ne la regardes plus) |
 | L (debug ouvert) | faire sauter le verrou de la chambre froide (pour tester le portage et les fins) |
 
-Options (écran titre ou pause) : sensibilité, volume, champ de vision, qualité (basse / moyenne / haute), grain et aberration, sous-titres des sons. Si ton PC rame, passe en « Basse » ; le jeu baisse aussi tout seul la résolution s'il descend sous ~48 fps.
+Options (écran titre ou pause) : sensibilité, volume, champ de vision, qualité (basse / moyenne / haute), grain et aberration, sous-titres des sons, durée de la nuit (36, 54 ou 72 min). Dans la pause : « Abandonner la ronde » pour revenir au titre. Si ton PC rame, passe en « Basse » ; le jeu baisse aussi tout seul la résolution s'il descend sous ~48 fps.
 
 Astuce caméras : elles montrent le passé (2 à 4 min de jeu, soit 18 à 36 s réelles). Juste après un saut dans le temps en debug, elles affichent « PAS DE SIGNAL » le temps d'enregistrer assez d'historique.
 

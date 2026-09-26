@@ -1,4 +1,4 @@
-import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, type Mesh, type Scene } from "@babylonjs/core";
+import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, type Mesh, type Scene } from "../babylon";
 import type { AudioEngine } from "../audio/AudioEngine";
 import { neonCrackle } from "../audio/Sounds";
 import { CONFIG } from "../config";

@@ -159,9 +159,9 @@ export class Narrative {
   /** Farid la porte : elle se réchauffe un peu, et elle lui parle à l'oreille. */
   private updateCarried(dt: number, dMinutes: number, ctx: NarrativeContext): void {
     this.temperature = Math.min(100, this.temperature + (CONFIG.carry.warmingPerHour * dMinutes) / 60);
-    // Sa voix vient de l'épaule de Farid.
-    this.npcs.sabine.x = ctx.player.x;
-    this.npcs.sabine.z = ctx.player.z;
+    // Sa voix vient de l'épaule de Farid (un peu décalée : pas pile sur l'auditeur).
+    this.npcs.sabine.x = ctx.player.x + 0.18;
+    this.npcs.sabine.z = ctx.player.z - 0.1;
     if (ctx.shopperActive && ctx.shopperState === "stopped" && ctx.shopperDistance < 15 && this.whisperCooldown <= 0) {
       this.whisperCooldown = 80;
       this.talkie.say(S_WHISPER, { interrupt: true });
@@ -304,7 +304,7 @@ export class Narrative {
     if (ctx.minutes < CONFIG.sabine.leavesAtMinutes) return D.callBefore[0];
     if (!this.locked && !this.freed) return D.callWalking[0];
     if (ctx.neonAbove === "orange" || (ctx.shopperState === "stopped" && ctx.shopperDistance < 12)) return D.callDanger[0];
-    if (this.freed) return D.callCarrying[0];
+    if (this.freed) return this.carried ? D.callCarrying[0] : D.callFreed[0];
     if (!ctx.hasPhoto) return D.callNoPhoto[0];
     const atDoor = Math.hypot(ctx.player.x - COLD_DOOR.x, ctx.player.z - COLD_DOOR.z) < 3.5;
     const look = ctx.lockLook ?? "verrou";

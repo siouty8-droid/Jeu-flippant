@@ -1,4 +1,4 @@
-import { Color3, DynamicTexture, StandardMaterial, type Scene } from "@babylonjs/core";
+import { Color3, DynamicTexture, StandardMaterial, type Scene } from "../babylon";
 
 /** Afficheur à cristaux liquides vert (caisse de la boucherie). Ne redessine que si le texte change. */
 export class LcdDisplay {

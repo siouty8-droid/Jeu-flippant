@@ -1,4 +1,4 @@
-import { Color3, HemisphericLight, PointLight, Scene, Vector3 } from "@babylonjs/core";
+import { Color3, HemisphericLight, PointLight, Scene, Vector3 } from "../babylon";
 import { CONFIG } from "../config";
 import type { NeonFixture } from "./WorldBuilder";
 
@@ -16,6 +16,8 @@ export class Lighting {
   /** Réutilisé à chaque frame : pas d'allocation, pas d'à-coups du ramasse-miettes. */
   private scratch: { index: number; dist: number }[] = [];
   private readonly hemi: HemisphericLight;
+  /** Point d'accroche du néon le plus proche du joueur (pour le son du ballast). */
+  readonly nearest = new Vector3(18, 3.9, 3);
 
   constructor(scene: Scene, neons: NeonFixture[]) {
     const hemi = new HemisphericLight("ambiance", new Vector3(0, 1, 0), scene);
@@ -57,6 +59,7 @@ export class Lighting {
       e.dist = Math.sqrt(dx * dx + dz * dz);
     }
     s.sort((a, b) => a.dist - b.dist);
+    if (s[0]) this.nearest.copyFrom(this.anchors[s[0].index].pos);
     const n = this.pool.length;
     const cutoff = s[n]?.dist ?? CONFIG.rendering.lightRange;
     for (let i = 0; i < n; i++) {

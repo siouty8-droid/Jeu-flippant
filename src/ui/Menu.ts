@@ -15,6 +15,7 @@ export class Menu {
     onStart: () => void,
     onResume: () => void,
     private readonly onSettings: (s: Settings) => void,
+    onQuit: () => void,
   ) {
     this.loading = el("div", "screen loading");
     this.loadingText = el("div", "loading-text", "Allumage des néons…");
@@ -33,7 +34,9 @@ export class Menu {
     const resume = el("button", "btn", "Reprendre la ronde");
     resume.addEventListener("click", onResume);
     this.inventory = el("ul", "inventory");
-    pbox.append(el("h2", "pause-title", "Pause"), resume, el("h3", "section", "Sur toi"), this.inventory, this.optionsPanel(), controls());
+    const quit = el("button", "btn btn-quiet", "Abandonner la ronde");
+    quit.addEventListener("click", onQuit);
+    pbox.append(el("h2", "pause-title", "Pause"), resume, el("h3", "section", "Sur toi"), this.inventory, this.optionsPanel(), controls(), quit);
     this.pause.append(pbox);
 
     parent.append(this.loading, this.title, this.pause);
@@ -88,6 +91,16 @@ export class Menu {
     }
     q.addEventListener("change", () => this.update({ quality: q.value as Quality }));
     row("Qualité", q);
+    const night = el("select");
+    night.dataset.key = "nightMinutes";
+    for (const [value, label] of [[36, "36 min (rapide)"], [54, "54 min"], [72, "72 min (lente)"]] as const) {
+      const o = el("option", undefined, label);
+      o.value = String(value);
+      o.selected = s.nightMinutes === value;
+      night.append(o);
+    }
+    night.addEventListener("change", () => this.update({ nightMinutes: Number(night.value) }));
+    row("Durée de la nuit", night);
     const fx = el("input");
     fx.type = "checkbox";
     fx.checked = s.effects;
@@ -121,7 +134,7 @@ function controls(): HTMLElement {
     ["ZQSD / WASD", "se déplacer"],
     ["Maj", "courir (ça s'entend)"],
     ["Souris", "regarder"],
-    ["E", "interagir (portes, écrans, plan)"],
+    ["E", "interagir (portes, écrans, plan, caisse…)"],
     ["T", "appeler Sabine au talkie"],
     ["Tab", "téléphone (photo du plan)"],
     ["Échap", "pause"],

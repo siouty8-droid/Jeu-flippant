@@ -1,4 +1,4 @@
-import type { Engine } from "@babylonjs/core";
+import type { Engine } from "../babylon";
 
 /**
  * Résolution adaptative : si le jeu reste sous ~48 fps, on baisse la résolution de rendu ;

@@ -204,3 +204,6 @@ html, body {
 .fade-text .ending { max-width: min(640px, 88vw); margin: 0 auto; color: #e3e7ea; text-shadow: 0 0 10px #000, 0 0 3px #000; }
 .fade-text .ending .small { font-size: 15px; color: #c3cad0; }
 .fade-text .hidden-ending { font-size: 22px; color: #e9ecef; letter-spacing: 0.06em; }
+
+.btn-quiet { margin-top: 24px; font-size: 14px; padding: 8px 18px; color: var(--dim); background: transparent; border: 1px solid #2b2f33; }
+.btn-quiet:hover { color: #0b0d10; background: #e9ecef; }

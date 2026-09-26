@@ -6,6 +6,8 @@ export class GameClock {
   private minutes: number = CONFIG.clock.startMinutes;
   private lastWholeMinute = -1;
   private dawnEmitted = false;
+  /** Secondes réelles par heure de jeu (option « Durée de la nuit »). */
+  realSecondsPerHour: number = CONFIG.clock.realSecondsPerGameHour;
 
   constructor(private readonly bus: EventBus) {}
 
@@ -15,7 +17,7 @@ export class GameClock {
 
   update(dtSeconds: number): void {
     if (this.minutes >= CONFIG.clock.endMinutes) return;
-    this.minutes += (dtSeconds * 60) / CONFIG.clock.realSecondsPerGameHour;
+    this.minutes += (dtSeconds * 60) / this.realSecondsPerHour;
     this.syncEvents();
   }
 

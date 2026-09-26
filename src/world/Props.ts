@@ -1,4 +1,4 @@
-import { Mesh, MeshBuilder, Scene, TransformNode } from "@babylonjs/core";
+import { Mesh, MeshBuilder, Scene, TransformNode } from "../babylon";
 import type { Materials } from "./Materials";
 
 /** Caddie simplifié. Réutilisé par le client de la nuit (règle 4). */

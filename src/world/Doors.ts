@@ -1,4 +1,4 @@
-import { Color3, MeshBuilder, StandardMaterial, TransformNode, Vector3, type Mesh, type Scene } from "@babylonjs/core";
+import { Color3, MeshBuilder, StandardMaterial, TransformNode, Vector3, type Mesh, type Scene } from "../babylon";
 import type { AudioEngine } from "../audio/AudioEngine";
 import { boltSlide, doorClose, doorLocked, doorOpen, keyTurn } from "../audio/Sounds";
 import { CONFIG } from "../config";

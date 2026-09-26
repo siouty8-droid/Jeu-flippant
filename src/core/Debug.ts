@@ -1,4 +1,4 @@
-import { SceneInstrumentation, type Engine, type Scene } from "@babylonjs/core";
+import { SceneInstrumentation, type Engine, type Scene } from "../babylon";
 import { el } from "../ui/Hud";
 import { GameClock } from "./GameClock";
 import { drawPlan } from "../ui/PlanRenderer";
@@ -97,7 +97,7 @@ export class Debug {
       `RAYON 9 · debug (F1)`,
       `fps        ${this.engine.getFps().toFixed(0)}   frame ${this.stats.frameMs.toFixed(1)} ms   draw calls ${this.stats.drawCalls}   résolution ×${(1 / info.scale).toFixed(2)}`,
       `seed       ${info.seed}`,
-      `heure      ${info.time}   [ / ] : ±15 min`,
+      `heure      ${info.time}   [ / ] : ±15 min · 1-6 : 00:55, 01:12, 02:28, 03:58, 04:58, 05:55`,
       `position   x ${info.x.toFixed(1)}  z ${info.z.toFixed(1)}`,
       `zone       ${info.zone}`,
       `vitesse    ${info.speed.toFixed(2)} m/s${info.running ? "  (course)" : ""}`,

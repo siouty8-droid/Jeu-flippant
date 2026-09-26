@@ -1,4 +1,4 @@
-import { Color3, MeshBuilder, StandardMaterial, type Mesh, type Scene } from "@babylonjs/core";
+import { Color3, MeshBuilder, StandardMaterial, type Mesh, type Scene } from "../babylon";
 import type { Rng } from "../core/Rng";
 import { Figure } from "../world/Figure";
 import type { NavGraph } from "../world/NavGraph";

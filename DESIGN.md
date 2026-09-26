@@ -31,7 +31,7 @@ Deux règles d'or, toute violation est un bug bloquant :
 | 5 | Que se passe-t-il si le client attrape le joueur ? | Pas de game over : fondu au noir, retour à 00:00 au poste de sécurité. Un badge de plus apparaît dans la pile du local technique. Ça sert la fin cachée. |
 | 6 | Le plan d'évacuation est « près de l'entrée ». Le joueur doit-il y retourner à chaque fois ? | Plan mural à gauche des portes automatiques. `E` le prend en photo, `Tab` sort le téléphone. La photo est un instantané du plan d'avant minuit, elle ne se met jamais à jour. Regarder son téléphone ne met pas le jeu en pause : ça ralentit (vitesse × 0,6) et **ça compte comme de la stagnation, même en marchant**. |
 | 7 | AZERTY / QWERTY | Pas de réglage : on lit `KeyboardEvent.code` (position physique). ZQSD en AZERTY et WASD en QWERTY tombent sur les mêmes codes. Les flèches marchent aussi. |
-| 8 | Durée de la nuit | 9 min réelles par heure de jeu, soit 54 min pour 00:00 → 06:00 (`CONFIG.clock`). |
+| 8 | Durée de la nuit | 9 min réelles par heure de jeu, soit 54 min pour 00:00 → 06:00 (`CONFIG.clock`). Réglable dans les options : 36, 54 ou 72 min. |
 | 9 | Portes des pièces à l'étape 1 | Ouvertes (cadres seulement). Les portes de secours sont fermées. Les vraies portes (clés, verrous, règle 5) arrivent à l'étape 5. L'entrée est bloquée par un mur invisible tant qu'il n'y a pas de fin. |
 | 10 | Température de Sabine | Jauge 100 → 0. Démarre à 01:10, descend d'environ 20/h, plus vite après 4h. Elle pilote la voix (filtre passe-bas, coupures) et la lampe. Réglable dans `config.ts` à l'étape 6. |
 | 11 | Code de la caisse boucherie | Visible seulement dans un replay des caméras, où une silhouette tape le code alors qu'il n'y avait personne en direct. |
@@ -173,6 +173,45 @@ Mesures (logique du jeu hors rendu, par frame) : **1,73 ms → 0,27 ms**. Draw c
   - Après une boucle sans pointer lock, le jeu reprenait sans souris : il passe maintenant par la pause.
   - Le HUD passait à travers le menu pause.
 
+## Polish (étape 9)
+
+- **Chargement** : le jeu n'importe plus l'index de Babylon (tout le moteur) mais seulement ce qu'il utilise (`src/babylon.ts`, imports profonds et effets de bord nécessaires).
+  - JS : 7,1 Mo → **1,58 Mo** (1,6 Mo → **398 Ko** compressé).
+  - Build : 100 s → 16 s.
+- **Son** :
+  - **Réverbération** du magasin : une réponse impulsionnelle synthétique de 1,7 s, dont les aigus s'éteignent vite. Chaque son spatialisé y envoie une part. Une petite part constante part avant la spatialisation, donc un son lointain arrive surtout par l'écho : le caddie s'entend de partout, de loin.
+  - **Ambiance spatialisée** (`audio/Ambience.ts`) :
+    - une ventilation grave partout ;
+    - le ballast du néon le plus proche, qui grésille au-dessus de toi ;
+    - les compresseurs des surgelés et de la vitrine de la boucherie, qui suivent leur rayon quand il bouge (on peut l'entendre changer de place) ;
+    - le compresseur de la chambre froide, qu'on entend à travers la réserve ;
+    - les frigos qui s'arrêtent et repartent par cycles, avec un « clonk ».
+  - **Souffle** (`audio/Breath.ts`) : Farid s'essouffle en courant et en portant Sabine. Il **retient sa respiration** quand le client est arrêté ou en traque à moins de 12 m : le silence, c'est la tension. Portée, Sabine respire faiblement à son oreille.
+  - Les pas sont plus lourds en la portant, et s'entendent à 3,2 m au lieu de 2,5.
+- **Post-process** :
+  - **Tension** : quand le client est arrêté (à moins de 18 m) ou en traque, l'image se resserre en douceur (vignette, grain, aberration, contraste, un peu moins de lumière). Rien de brusque, pas de jumpscare.
+  - Dans la chambre froide, les bords de l'image bleuissent.
+  - En portant Sabine, la tête tangue légèrement d'un côté à l'autre.
+- **Menu** :
+  - « Durée de la nuit » (vitesse de l'horloge) ;
+  - « Abandonner la ronde » dans la pause (retour au titre, sans compter de boucle) ;
+  - sous-titres des sons (étape 8).
+  - La disposition AZERTY/QWERTY n'a pas besoin de réglage : les touches sont lues par position physique.
+- **Debug** : `1` à `6` sautent aux moments clés (00:55, 01:12, 02:28, 03:58, 04:58, 05:55).
+- **Perf** (mesurée dans Chromium sans carte graphique, donc en logiciel) :
+  - La logique du jeu prend **0,3 à 0,4 ms par frame**. La radio et l'ambiance sont négligeables.
+  - Draw calls : 113 à l'entrée, 76 dans une allée, 54 dans la réserve, 26 au poste.
+  - Les produits sont un mesh à instances fines par rayon. Les étagères d'un rayon sont fusionnées en un seul mesh : un rayon, c'est quelques draw calls, qu'on déplace en bloc lors d'un réagencement ou d'un replay de caméra.
+  - Instancier les étagères *entre* rayons forcerait à réécrire les tampons à chaque rendu de caméra en différé : ce n'est pas rentable.
+- **Équilibrage** : tout est dans `config.ts`. Les valeurs retenues :
+  - la nuit dure 54 min ;
+  - le client arrive à 01:10 et s'arrête à partir de 02:30 ;
+  - le code passe sur la CAM 4 toutes les 20 min dès 02:30 ;
+  - Sabine perd 16 °/h puis 30 °/h après 04:00, donc silence vers 05:50 ;
+  - la serrure demande 30 s sans stagner ;
+  - en portant Sabine : vitesse × 0,5 et seuil de stagnation × 0,55.
+  - Ce n'est pas encore testé à la manette par un vrai joueur. Ce sont les premiers chiffres à retoucher.
+
 ## Rendu
 
 - Babylon.js 9, WebGL2. Hémisphérique faible + **pool de 4 PointLight** qui se collent aux néons les plus proches. Leur intensité décroît vers le bord du pool pour éviter les « pops ».
@@ -198,4 +237,4 @@ Mesures (logique du jeu hors rendu, par frame) : **1,73 ms → 0,27 ms**. Draw c
   - pile de badges ;
   - sous-titres des sons ;
   - debug (K : double, L : ouvrir la chambre froide).
-- [ ] Étape 9 — Polish
+- [x] **Étape 9 — Polish** : bundle allégé (imports profonds), réverbération, ambiance spatialisée, souffle, post-process de tension et de froid, durée de la nuit et abandon dans le menu, sauts d'heure en debug.

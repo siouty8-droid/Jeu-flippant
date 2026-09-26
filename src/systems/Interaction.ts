@@ -1,4 +1,4 @@
-import type { AbstractMesh, Scene, UniversalCamera, Vector3 } from "@babylonjs/core";
+import type { AbstractMesh, Scene, UniversalCamera, Vector3 } from "../babylon";
 import type { Hud } from "../ui/Hud";
 
 export interface Interactable {

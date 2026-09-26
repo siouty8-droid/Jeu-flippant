@@ -13,19 +13,20 @@ export class NoiseSystem {
 
   constructor(private readonly audio: AudioEngine) {}
 
-  update(dt: number, speed: number, running: boolean): void {
+  /** `carrying` : Farid porte Sabine, ses pas sont plus lourds (et s'entendent un peu plus loin). */
+  update(dt: number, speed: number, running: boolean, carrying = false): void {
     const n = CONFIG.noise;
     const loud = running && speed > CONFIG.player.walkSpeed * 1.2;
-    this.radius = speed < 0.3 ? 0 : loud ? n.runRadius : n.walkRadius;
+    this.radius = speed < 0.3 ? 0 : loud ? n.runRadius : carrying ? CONFIG.carry.noiseRadius : n.walkRadius;
     if (speed < 0.3) {
       this.stepDistance = 0;
       return;
     }
     this.stepDistance += speed * dt;
-    const stepLength = loud ? n.runStepLength : n.walkStepLength;
+    const stepLength = loud ? n.runStepLength : carrying ? n.walkStepLength * 0.8 : n.walkStepLength;
     if (this.stepDistance >= stepLength) {
       this.stepDistance -= stepLength;
-      footstep(this.audio, null, loud);
+      footstep(this.audio, "body", loud, carrying);
     }
   }
 

@@ -1,4 +1,4 @@
-import type { Scene } from "@babylonjs/core";
+import type { Scene } from "../babylon";
 import { Figure } from "./Figure";
 
 /** Calque visible uniquement par les caméras de surveillance. */

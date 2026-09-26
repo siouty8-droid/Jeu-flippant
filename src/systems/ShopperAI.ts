@@ -1,4 +1,4 @@
-import type { Scene } from "@babylonjs/core";
+import type { Scene } from "../babylon";
 import type { AudioEngine } from "../audio/AudioEngine";
 import { CartRattle, canClink, footstep } from "../audio/Sounds";
 import type { Rng } from "../core/Rng";

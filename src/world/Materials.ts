@@ -1,4 +1,4 @@
-import { Color3, DynamicTexture, Scene, StandardMaterial, Texture } from "@babylonjs/core";
+import { Color3, DynamicTexture, Scene, StandardMaterial, Texture } from "../babylon";
 import { CONFIG } from "../config";
 
 /** Hémisphérique + le pool de PointLight. */

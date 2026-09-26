@@ -13,7 +13,7 @@ import {
   type AbstractMesh,
   type Material,
   type UniversalCamera,
-} from "@babylonjs/core";
+} from "../babylon";
 import { CONFIG } from "../config";
 import { GameClock } from "../core/GameClock";
 import { activeEvent, type ReplayEvent } from "../narrative/ReplayEvents";

@@ -1,4 +1,4 @@
-import { MeshBuilder, Scene, TransformNode, type Mesh } from "@babylonjs/core";
+import { MeshBuilder, Scene, TransformNode, type Mesh } from "../babylon";
 import { mat } from "./Materials";
 import { consolidate } from "./Merge";
 

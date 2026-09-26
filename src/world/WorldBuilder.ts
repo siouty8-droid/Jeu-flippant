@@ -1,4 +1,4 @@
-import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial, Texture, TransformNode, Vector3 } from "@babylonjs/core";
+import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial, Texture, TransformNode, Vector3 } from "../babylon";
 import { Rng } from "../core/Rng";
 import { drawPlan } from "../ui/PlanRenderer";
 import { createMaterials, mat, textTexture, type Materials } from "./Materials";

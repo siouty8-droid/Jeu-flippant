@@ -1,9 +1,31 @@
-import { AudioEngine, type Vec3Like } from "./AudioEngine";
+import { AudioEngine, type SoundPos, type Vec3Like } from "./AudioEngine";
 
-/** Pas sur le carrelage. `loud` = course. */
-export function footstep(audio: AudioEngine, pos: Vec3Like | null, loud: boolean): void {
-  audio.burst(pos, { freq: loud ? 2200 : 1800, q: 1.2, gain: loud ? 0.5 : 0.16, duration: loud ? 0.09 : 0.06 });
-  audio.tone(pos, { freq: loud ? 95 : 80, freqEnd: 50, gain: loud ? 0.35 : 0.1, duration: 0.07 });
+/** Pas sur le carrelage. `loud` = course, `heavy` = Farid porte Sabine. */
+export function footstep(audio: AudioEngine, pos: SoundPos, loud: boolean, heavy = false): void {
+  const v = 0.85 + Math.random() * 0.3;
+  audio.burst(pos, { freq: (loud ? 2200 : heavy ? 1300 : 1800) * v, q: 1.2, gain: (loud ? 0.5 : heavy ? 0.22 : 0.16) * v, duration: loud ? 0.09 : heavy ? 0.08 : 0.06 });
+  audio.tone(pos, { freq: loud ? 95 : heavy ? 70 : 80, freqEnd: heavy ? 40 : 50, gain: loud ? 0.35 : heavy ? 0.22 : 0.1, duration: heavy ? 0.1 : 0.07 });
+}
+
+/** Une respiration : `inhale` (inspiration) ou expiration, `strength` 0..1. `pitch` > 1 : voix plus fine (Sabine). */
+export function breath(audio: AudioEngine, pos: SoundPos, inhale: boolean, strength: number, pitch = 1): void {
+  if (!audio.ready) return;
+  const ctx = audio.ctx!;
+  const t = ctx.currentTime;
+  const duration = (inhale ? 0.42 : 0.55) * (1.2 - strength * 0.4);
+  const src = audio.noiseSource(false);
+  const band = ctx.createBiquadFilter();
+  band.type = "bandpass";
+  band.Q.value = 0.9;
+  band.frequency.setValueAtTime((inhale ? 1300 : 850) * pitch, t);
+  band.frequency.linearRampToValueAtTime((inhale ? 1800 : 650) * pitch, t + duration);
+  const g = ctx.createGain();
+  const peak = 0.07 * strength;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t + duration * (inhale ? 0.6 : 0.25));
+  g.gain.linearRampToValueAtTime(0, t + duration);
+  src.connect(band).connect(g).connect(audio.panner(pos));
+  src.start(t, Math.random() * 1.5, duration + 0.05);
 }
 
 /** Grésillement d'un néon qui clignote. */
@@ -33,7 +55,9 @@ export class CartRattle {
 
   constructor(private readonly audio: AudioEngine) {
     const ctx = audio.ctx!;
-    this.panner = audio.panner({ x: 0, y: 0.2, z: 0 }, 2.5, 1.1) as PannerNode;
+    const source = audio.spatial({ x: 0, y: 0.2, z: 0 }, 2.5, 1.1);
+    this.panner = source.panner;
+    const out = source.input;
 
     const rumble = audio.noiseSource();
     const low = ctx.createBiquadFilter();
@@ -41,7 +65,7 @@ export class CartRattle {
     low.frequency.value = 220;
     this.rumbleGain = ctx.createGain();
     this.rumbleGain.gain.value = 0;
-    rumble.connect(low).connect(this.rumbleGain).connect(this.panner);
+    rumble.connect(low).connect(this.rumbleGain).connect(out);
     rumble.start();
 
     const rattle = audio.noiseSource();
@@ -51,12 +75,12 @@ export class CartRattle {
     band.Q.value = 1.5;
     this.rattleGain = ctx.createGain();
     this.rattleGain.gain.value = 0;
-    rattle.connect(band).connect(this.rattleGain).connect(this.panner);
+    rattle.connect(band).connect(this.rattleGain).connect(out);
     rattle.start();
   }
 
   update(dt: number, pos: Vec3Like, speed: number): void {
-    AudioEngine.place(this.panner, pos);
+    this.audio.move(this.panner, pos, 0.03);
     this.speed += (speed - this.speed) * Math.min(1, dt * 6);
     const t = this.audio.now;
     const level = Math.min(1, this.speed / 1.2);
@@ -75,30 +99,6 @@ export class CartRattle {
       }
     }
   }
-}
-
-/** Bourdonnement de fond du magasin : frigos et ballasts de néons. */
-export function startAmbience(audio: AudioEngine): void {
-  const ctx = audio.ctx!;
-  const hum = ctx.createOscillator();
-  hum.type = "sawtooth";
-  hum.frequency.value = 100;
-  const humFilter = ctx.createBiquadFilter();
-  humFilter.type = "lowpass";
-  humFilter.frequency.value = 320;
-  const humGain = ctx.createGain();
-  humGain.gain.value = 0.018;
-  hum.connect(humFilter).connect(humGain).connect(audio.master!);
-  hum.start();
-
-  const fridge = audio.noiseSource();
-  const fFilter = ctx.createBiquadFilter();
-  fFilter.type = "lowpass";
-  fFilter.frequency.value = 140;
-  const fGain = ctx.createGain();
-  fGain.gain.value = 0.06;
-  fridge.connect(fFilter).connect(fGain).connect(audio.master!);
-  fridge.start();
 }
 
 /** Porte qui s'ouvre : grincement de gond + loquet. `heavy` pour les portes métalliques. */
@@ -228,17 +228,17 @@ export function heavyStep(audio: AudioEngine, pos: Vec3Like): void {
 }
 
 /** Touche du clavier de la caisse. */
-export function keyBeep(audio: AudioEngine, pos: Vec3Like | null): void {
+export function keyBeep(audio: AudioEngine, pos: SoundPos): void {
   audio.tone(pos, { freq: 1480, gain: 0.08, duration: 0.07, type: "square" });
 }
 
 /** Code erroné. */
-export function errorBuzz(audio: AudioEngine, pos: Vec3Like | null): void {
+export function errorBuzz(audio: AudioEngine, pos: SoundPos): void {
   audio.tone(pos, { freq: 190, gain: 0.12, duration: 0.4, type: "square" });
 }
 
 /** Le tiroir-caisse qui s'ouvre. */
-export function drawerOpen(audio: AudioEngine, pos: Vec3Like | null): void {
+export function drawerOpen(audio: AudioEngine, pos: SoundPos): void {
   audio.tone(pos, { freq: 1568, gain: 0.1, duration: 0.5, type: "triangle" });
   setTimeout(() => audio.tone(pos, { freq: 2093, gain: 0.08, duration: 0.7, type: "triangle" }), 110);
   setTimeout(() => audio.burst(pos, { freq: 900, q: 1, gain: 0.4, duration: 0.18, type: "lowpass" }), 60);

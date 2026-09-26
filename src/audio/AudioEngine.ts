@@ -10,10 +10,22 @@ export interface Vec3Like {
   z: number;
 }
 
+/**
+ * Où joue un son : une position dans le magasin (spatialisé), `"body"` (le corps de Farid :
+ * ses pas, son souffle — pas de spatialisation, un peu de réverbération) ou `null` (dans la tête :
+ * talkie, interface).
+ */
+export type SoundPos = Vec3Like | "body" | null;
+
 export class AudioEngine {
   ctx: AudioContext | null = null;
   master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  /** Réverbération du magasin : grand volume carrelé, un peu plus d'une seconde et demie de queue. */
+  private reverbIn: GainNode | null = null;
+  /** Envoi constant vers la réverbération (avant la spatialisation) : un son lointain arrive surtout par l'écho. */
+  private farSend: GainNode | null = null;
+  private body: GainNode | null = null;
   private volume = 0.9;
   private muted = false;
 
@@ -35,6 +47,46 @@ export class AudioEngine {
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+
+    const convolver = this.ctx.createConvolver();
+    convolver.buffer = AudioEngine.impulse(this.ctx, 1.7);
+    const wet = this.ctx.createGain();
+    wet.gain.value = 0.55;
+    this.reverbIn = this.ctx.createGain();
+    this.reverbIn.gain.value = 0.3;
+    this.reverbIn.connect(convolver).connect(wet).connect(this.master);
+    this.farSend = this.ctx.createGain();
+    this.farSend.gain.value = 0.06;
+    this.farSend.connect(convolver);
+    this.body = this.ctx.createGain();
+    this.body.connect(this.master);
+    const bodyWet = this.ctx.createGain();
+    bodyWet.gain.value = 0.35;
+    this.body.connect(bodyWet).connect(this.reverbIn);
+  }
+
+  /**
+   * Réponse impulsionnelle synthétique : bruit stéréo qui décroît exponentiellement, de plus en
+   * plus sourd (les aigus meurent plus vite), après un court pré-délai.
+   */
+  static impulse(ctx: BaseAudioContext, seconds: number): AudioBuffer {
+    const rate = ctx.sampleRate;
+    const len = Math.floor(rate * seconds);
+    const pre = Math.floor(rate * 0.022);
+    const buf = ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let low = 0;
+      for (let i = pre; i < len; i++) {
+        const t = (i - pre) / rate;
+        const white = Math.random() * 2 - 1;
+        // Filtre passe-bas à un pôle dont la coupure descend avec le temps.
+        const k = Math.max(0.04, 0.9 * Math.exp(-t * 2.2));
+        low += k * (white - low);
+        d[i] = low * Math.exp(-t * 3.4) * (1 + (ch === 0 ? 0.03 : -0.03));
+      }
+    }
+    return buf;
   }
 
   get ready(): boolean {
@@ -77,10 +129,20 @@ export class AudioEngine {
     }
   }
 
-  /** Nœud de spatialisation. `null` = son « dans la tête » (pas de panner). */
-  panner(pos: Vec3Like | null, refDistance = 2, rolloff = 1.3): AudioNode {
+  /**
+   * Point d'entrée d'un son selon sa position : spatialisé (HRTF + réverbération), sur le corps
+   * de Farid, ou dans la tête.
+   */
+  panner(pos: SoundPos, refDistance = 2, rolloff = 1.3): AudioNode {
+    if (pos === null) return this.master!;
+    if (pos === "body") return this.body!;
+    return this.spatial(pos, refDistance, rolloff).input;
+  }
+
+  /** Source spatialisée : `panner` peut être déplacé ensuite (roulettes, frigos…). */
+  spatial(pos: Vec3Like, refDistance = 2, rolloff = 1.3): { input: AudioNode; panner: PannerNode } {
     const ctx = this.ctx!;
-    if (!pos) return this.master!;
+    const input = ctx.createGain();
     const p = ctx.createPanner();
     p.panningModel = "HRTF";
     p.distanceModel = "inverse";
@@ -88,8 +150,23 @@ export class AudioEngine {
     p.rolloffFactor = rolloff;
     p.maxDistance = 80;
     AudioEngine.place(p, pos);
+    input.connect(p);
     p.connect(this.master!);
-    return p;
+    p.connect(this.reverbIn!);
+    input.connect(this.farSend!);
+    return { input, panner: p };
+  }
+
+  /** Déplace une source en douceur (pas de clic quand elle saute d'un point à l'autre). */
+  move(p: PannerNode, pos: Vec3Like, seconds = 0.08): void {
+    if (!this.ctx || !p.positionX) {
+      AudioEngine.place(p, pos);
+      return;
+    }
+    const t = this.ctx.currentTime;
+    p.positionX.setTargetAtTime(pos.x, t, seconds);
+    p.positionY.setTargetAtTime(pos.y, t, seconds);
+    p.positionZ.setTargetAtTime(-pos.z, t, seconds);
   }
 
   static place(p: PannerNode, pos: Vec3Like): void {
@@ -109,7 +186,7 @@ export class AudioEngine {
   }
 
   /** Rafale de bruit filtré avec enveloppe : pas, grésillements, clics. */
-  burst(pos: Vec3Like | null, opts: { freq: number; q: number; gain: number; duration: number; type?: BiquadFilterType }): void {
+  burst(pos: SoundPos, opts: { freq: number; q: number; gain: number; duration: number; type?: BiquadFilterType }): void {
     if (!this.ready) return;
     const ctx = this.ctx!;
     const t = ctx.currentTime;
@@ -127,7 +204,7 @@ export class AudioEngine {
   }
 
   /** Note brève (tintement de conserve, grincement). */
-  tone(pos: Vec3Like | null, opts: { freq: number; freqEnd?: number; gain: number; duration: number; type?: OscillatorType }): void {
+  tone(pos: SoundPos, opts: { freq: number; freqEnd?: number; gain: number; duration: number; type?: OscillatorType }): void {
     if (!this.ready) return;
     const ctx = this.ctx!;
     const t = ctx.currentTime;

@@ -1,4 +1,4 @@
-import { Mesh, MeshBuilder, Scene, UniversalCamera, Vector3 } from "@babylonjs/core";
+import { Mesh, MeshBuilder, Scene, UniversalCamera, Vector3 } from "../babylon";
 import { CONFIG } from "../config";
 
 /**
@@ -113,6 +113,10 @@ export class PlayerController {
     else this.bobPhase *= 0.9;
     const bobY = Math.sin(this.bobPhase) * bob * intensity;
     const bobX = Math.cos(this.bobPhase * 0.5) * bob * 0.5 * intensity;
+
+    // En portant Sabine, le poids fait tanguer la tête d'un côté à l'autre.
+    const roll = this.carrying ? Math.sin(this.bobPhase * 0.5) * 0.022 * intensity : 0;
+    this.camera.rotation.z += (roll - this.camera.rotation.z) * Math.min(1, dt * 8);
 
     this.camera.position.set(
       this.body.position.x + Math.cos(yaw) * bobX,

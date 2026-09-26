@@ -185,6 +185,8 @@ export const CONFIG = {
     stagnationFactor: 0.55,
     /** Sa température remonte (sur 100, par heure de jeu). */
     warmingPerHour: 12,
+    /** Pas plus lourds : le client les entend d'un peu plus loin qu'à la marche normale. */
+    noiseRadius: 3.2,
   },
 
   rendering: {

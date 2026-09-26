@@ -1,4 +1,4 @@
-import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, Vector3, type Mesh, type Scene } from "@babylonjs/core";
+import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, Vector3, type Mesh, type Scene } from "../babylon";
 import { Rng } from "../core/Rng";
 
 const MAX_BADGES = 32;

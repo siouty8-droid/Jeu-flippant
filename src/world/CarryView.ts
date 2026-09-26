@@ -1,4 +1,4 @@
-import { Color3, MeshBuilder, Quaternion, StandardMaterial, TransformNode, Vector3, type Scene, type UniversalCamera } from "@babylonjs/core";
+import { Color3, MeshBuilder, Quaternion, StandardMaterial, TransformNode, Vector3, type Scene, type UniversalCamera } from "../babylon";
 
 /** Calque visible seulement par la caméra du joueur (pas par les caméras de surveillance). */
 export const PLAYER_ONLY_LAYER = 0x20000000;

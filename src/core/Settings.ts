@@ -10,10 +10,12 @@ export interface Settings {
   fov: number;
   /** Sous-titrer les sons importants (roulettes qui s'arrêtent, musique inconnue…). */
   captions: boolean;
+  /** Durée réelle de la nuit 00:00 → 06:00, en minutes (vitesse de l'horloge). */
+  nightMinutes: number;
 }
 
 const KEY = "rayon9-reglages";
-const DEFAULTS: Settings = { sensitivity: 1, volume: 0.9, quality: "moyenne", effects: true, fov: 72, captions: false };
+const DEFAULTS: Settings = { sensitivity: 1, volume: 0.9, quality: "moyenne", effects: true, fov: 72, captions: false, nightMinutes: 54 };
 
 export function loadSettings(): Settings {
   try {

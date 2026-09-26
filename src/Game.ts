@@ -1,6 +1,8 @@
-import { Color3, Color4, DefaultRenderingPipeline, Engine, Scene, Vector3, type Mesh } from "@babylonjs/core";
+import { Color3, Color4, DefaultRenderingPipeline, Engine, Scene, Vector3, type Mesh } from "./babylon";
 import { AudioEngine } from "./audio/AudioEngine";
-import { drawerOpen, errorBuzz, keyBeep, monitorAlarm, startAmbience } from "./audio/Sounds";
+import { Ambience } from "./audio/Ambience";
+import { Breath } from "./audio/Breath";
+import { drawerOpen, errorBuzz, keyBeep, monitorAlarm } from "./audio/Sounds";
 import { StoreRadio } from "./audio/StoreRadio";
 import { CONFIG } from "./config";
 import { Debug, type DebugInfo } from "./core/Debug";
@@ -93,7 +95,8 @@ export class Game {
   settings: Settings = loadSettings();
   private radioChoice: RadioChoice | null = null;
   private snapshotTimer = 0;
-  private ambienceStarted = false;
+  private ambience: Ambience | null = null;
+  private readonly breath = new Breath(this.audio);
   private readonly pipeline: DefaultRenderingPipeline;
   private readonly resolution: AdaptiveResolution;
   private readonly fade: Fade;
@@ -115,6 +118,10 @@ export class Game {
   /** Heure d'ouverture du clavier ou de la fiche (le même appui sur E ne doit pas les refermer). */
   private overlayOpenedAt = 0;
   private lastShopperState = "inactive";
+  /** Post-process : tension (client arrêté ou en traque tout près) et froid, lissés. */
+  private tension = 0;
+  private chill = 0;
+  private readonly postKey = { t: -1, c: -1 };
   /** Recyclés à chaque frame. */
   private readonly forward = new Vector3();
   private readonly tmpEye: Eye = { x: 0, y: 0, z: 0, forward: { x: 0, y: 0, z: 1 }, halfAngle: 1 };
@@ -172,7 +179,7 @@ export class Game {
     this.plan = new EvacuationPlan(uiRoot, this.layout);
     this.keypad = new Keypad(uiRoot);
     this.note = new Note(uiRoot);
-    this.menu = new Menu(uiRoot, this.settings, () => this.requestPlay(), () => this.requestPlay(), (s) => this.applySettings(s));
+    this.menu = new Menu(uiRoot, this.settings, () => this.requestPlay(), () => this.requestPlay(), (s) => this.applySettings(s), () => this.abandon());
     this.debug = new Debug(uiRoot, this.engine, this.layout, this.scene);
     this.fade = new Fade(uiRoot);
     this.interaction = new Interaction(this.scene, this.player.camera, this.hud, (a, b) => this.occlusion.blocked(a, b));
@@ -249,10 +256,19 @@ export class Game {
     p.imageProcessing.vignetteEnabled = true;
     p.imageProcessing.vignetteWeight = 2.2;
     p.imageProcessing.vignetteColor = new Color4(0, 0, 0, 0);
+    this.postKey.t = -1;
     this.resolution.setRange(q.minScale, q.maxScale);
     this.player.camera.fov = (s.fov * Math.PI) / 180;
     this.player.camera.angularSensibility = 2500 / s.sensitivity;
     this.audio.setVolume(s.volume);
+    this.clock.realSecondsPerHour = (s.nightMinutes * 60) / 6;
+  }
+
+  /** Pause → « Abandonner la ronde » : retour au titre, la nuit recommence de zéro (sans boucle). */
+  private abandon(): void {
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.startNight(SPAWN);
+    this.setState("title");
   }
 
   /** Sous-titre d'un son important, si l'option est activée. */
@@ -453,10 +469,9 @@ export class Game {
   /** L'audio ne peut démarrer qu'après un geste de l'utilisateur. */
   private startAudio(): void {
     this.audio.start();
-    if (this.audio.ctx && !this.ambienceStarted) {
-      this.ambienceStarted = true;
+    if (this.audio.ctx && !this.ambience) {
       this.audio.setVolume(this.settings.volume);
-      startAmbience(this.audio);
+      this.ambience = new Ambience(this.audio);
     }
   }
 
@@ -516,6 +531,12 @@ export class Game {
     if (code === "KeyJ") {
       const p = this.player.position;
       this.shopper.debugStopAhead(p.x, p.z, this.player.yaw);
+    }
+    // 1-6 : sauter aux moments clés de la nuit.
+    const jumps: Record<string, number> = { Digit1: 55, Digit2: 72, Digit3: 148, Digit4: 238, Digit5: 298, Digit6: 355 };
+    if (jumps[code] !== undefined) {
+      this.clock.set(jumps[code]);
+      this.hud.setTime(this.clock.format());
     }
     // K : le double de la clé ; L : la serrure de la chambre froide cède (si Sabine est enfermée).
     if (code === "KeyK") this.inventory.add("double-froide");
@@ -603,6 +624,7 @@ export class Game {
     this.radioDirector.reset();
     this.graph.avoidStable.clear();
     this.player.carrying = false;
+    this.breath.reset();
     this.carryView.setEnabled(false);
     if (this.entranceBlocker) this.entranceBlocker.checkCollisions = true;
     this.badges.setCount(badgeList(this.loops).length);
@@ -838,7 +860,9 @@ export class Game {
       const b = this.shopper.brain;
       const avoid = [...(b.active ? [{ x: b.x, z: b.z }] : []), ...this.npcs.all.filter((w) => w.active).map((w) => ({ x: w.x, z: w.z }))];
       this.reshuffle.update(dt, minutes, this.eye(), { x: p.x, z: p.z }, avoid);
-      this.noise.update(dt, this.player.speed, this.player.running);
+      this.noise.update(dt, this.player.speed, this.player.running, this.player.carrying);
+      const holding = b.active && (b.state === "stopped" || b.state === "hunting") && Math.hypot(b.x - p.x, b.z - p.z) < 12;
+      this.breath.update(dt, { running: this.player.running, moving: this.player.speed > 0.3, carrying: this.player.carrying, holding, sabineWeakness: this.narrative.weakness });
       this.updateColdLock(dt);
 
       // Règle 4 : le client arrive quand Sabine est enfermée, et va d'abord au rayon des conserves.
@@ -864,8 +888,10 @@ export class Game {
     if (this.cameras.zoomed !== null) this.hud.setPrompt("[← →] changer de caméra · [E] revenir");
 
     this.updateRadio(p.x, p.z, zone.id, minutes);
+    this.updateAmbience(dt);
 
     const b = this.shopper.brain;
+    this.updatePost(dt, zone.id, playing);
     this.neons.update(dt, b.active ? { x: b.x, z: b.z, state: b.state } : null, { x: p.x, z: p.z });
     this.lighting.update(p, (i) => this.neons.light(i));
 
@@ -880,6 +906,49 @@ export class Game {
     if (this.coldLock.update(dt, this.dwell.stagnation, this.inventory.has("double-froide"), seen)) {
       this.doors.setLockColor(door, LOCK_COLOR[this.coldLock.look]);
     }
+  }
+
+  /**
+   * L'image se resserre quand le client s'est arrêté ou traque tout près : vignette, grain,
+   * aberration, un peu moins de lumière. Rien de brusque (pas de jumpscare). Dans la chambre
+   * froide, les bords de l'image bleuissent.
+   */
+  private updatePost(dt: number, zoneId: string, playing: boolean): void {
+    const b = this.shopper.brain;
+    const p = this.player.position;
+    let want = 0;
+    if (playing && b.active && (b.state === "stopped" || b.state === "hunting")) {
+      const d = Math.hypot(b.x - p.x, b.z - p.z);
+      want = b.state === "hunting" ? Math.min(1, Math.max(0.5, (24 - d) / 14)) : Math.min(1, Math.max(0, (18 - d) / 12));
+    }
+    this.tension += (want - this.tension) * Math.min(1, dt * (want > this.tension ? 0.9 : 0.35));
+    const cold = zoneId === "froide" ? 1 : 0;
+    this.chill += (cold - this.chill) * Math.min(1, dt * 0.8);
+
+    // On ne touche au pipeline que si ça a vraiment changé.
+    const t = Math.round(this.tension * 50) / 50;
+    const c = Math.round(this.chill * 50) / 50;
+    if (t === this.postKey.t && c === this.postKey.c) return;
+    this.postKey.t = t;
+    this.postKey.c = c;
+    const pp = this.pipeline;
+    pp.imageProcessing.vignetteWeight = 2.2 + 2.6 * t + 1.2 * c;
+    pp.imageProcessing.vignetteColor = new Color4(0.05 * c, 0.22 * c, 0.42 * c, 0);
+    pp.imageProcessing.exposure = 1.0 - 0.14 * t;
+    pp.imageProcessing.contrast = 1.12 + 0.12 * t;
+    if (pp.grainEnabled) pp.grain.intensity = 9 + 9 * t;
+    if (pp.chromaticAberrationEnabled) pp.chromaticAberration.aberrationAmount = 14 + 26 * t;
+  }
+
+  /** Frigos et néon le plus proche, spatialisés. Les surgelés et la boucherie suivent leur rayon. */
+  private updateAmbience(dt: number): void {
+    if (!this.ambience) return;
+    const at = (module: number, dx: number) => {
+      if (this.layout.slotOfModule(module) === -1) return null;
+      const r = this.world.modules.get(module)!.root.position;
+      return { x: r.x + dx, y: 1.1, z: r.z };
+    };
+    this.ambience.update(dt, this.lighting.nearest, at(5, 0), at(BUTCHER, 2.4));
   }
 
   /** Étape 7 : la radio du magasin suit le joueur de zone en zone. */

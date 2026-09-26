@@ -1,4 +1,4 @@
-import { Mesh, type AbstractMesh, type TransformNode } from "@babylonjs/core";
+import { Mesh, type AbstractMesh, type TransformNode } from "../babylon";
 
 /**
  * Fusionne les meshes statiques sous `root`, regroupés par matériau (et par drapeaux

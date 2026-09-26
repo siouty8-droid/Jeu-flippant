@@ -115,7 +115,7 @@ describe("Narrative", () => {
     expect(s.narrative.carried).toBe(true);
     expect(s.narrative.temperature).toBeGreaterThan(t);
     // Sa voix vient de l'épaule de Farid.
-    expect(s.npcs.sabine.x).toBeCloseTo(20);
+    expect(s.npcs.sabine.x).toBeCloseTo(20, 0);
     expect(s.npcs.sabine.figure.enabled).toBe(false);
   });
 
