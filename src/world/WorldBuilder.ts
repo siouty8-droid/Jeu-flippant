@@ -25,8 +25,8 @@ export interface World {
   monitors: Mesh[];
   /** Le plan d'évacuation mural (interactif : photo). */
   planPanel: Mesh;
-  /** Place chaque module dans le slot que lui donne layout.assignment. */
-  placeModules(): void;
+  /** Place chaque module dans le slot que lui donne `assignment` (par défaut layout.assignment). */
+  placeModules(assignment?: readonly number[]): void;
 }
 
 const PARKED = new Vector3(0, -50, 0);
@@ -57,9 +57,9 @@ export function buildWorld(scene: Scene, layout: StoreLayout, rng: Rng): World {
   const modules = new Map<number, ModuleInstance>();
   for (const def of MODULES) modules.set(def.id, factory.build(def));
 
-  const placeModules = () => {
+  const placeModules = (assignment: readonly number[] = layout.assignment) => {
     const placed = new Set<number>();
-    layout.assignment.forEach((id, slotIndex) => {
+    assignment.forEach((id, slotIndex) => {
       const slot = layout.slots[slotIndex];
       const inst = modules.get(id)!;
       inst.root.position.set(slot.cx, 0, slot.cz);

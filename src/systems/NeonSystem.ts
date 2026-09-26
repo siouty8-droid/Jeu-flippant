@@ -74,6 +74,30 @@ export class NeonSystem {
     return best.state;
   }
 
+  /** État de tous les néons (0 blanc, 1 clignotement, 2 orange), pour l'enregistrement des caméras. */
+  captureStates(): Uint8Array {
+    return Uint8Array.from(this.tubes, (t) => (t.state === "orange" ? 2 : t.state === "flicker" ? 1 : 0));
+  }
+
+  private saved: Color3[] | null = null;
+
+  /** Applique temporairement des états passés (rendu d'une caméra), à annuler avec restoreStates. */
+  applyStates(states: Uint8Array): void {
+    this.saved = this.tubes.map((t) => t.material.emissiveColor.clone());
+    this.tubes.forEach((t, i) => {
+      const st = states[i] ?? 0;
+      const base = st === 2 ? ORANGE : t.fixture.cold ? COLD : WHITE;
+      const level = st === 1 ? 0.35 + 0.6 * this.rng.next() : 1;
+      t.material.emissiveColor.copyFromFloats(base.r * level, base.g * level, base.b * level);
+    });
+  }
+
+  restoreStates(): void {
+    if (!this.saved) return;
+    this.tubes.forEach((t, i) => t.material.emissiveColor.copyFrom(this.saved![i]));
+    this.saved = null;
+  }
+
   /** Couleur et intensité à donner à une vraie lumière placée sous ce néon. */
   light(index: number): { color: Color3; level: number } {
     const t = this.tubes[index];

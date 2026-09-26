@@ -1,5 +1,6 @@
 import type { Engine } from "@babylonjs/core";
 import { el } from "../ui/Hud";
+import { GameClock } from "./GameClock";
 import { drawPlan } from "../ui/PlanRenderer";
 import type { StoreLayout } from "../world/StoreLayout";
 
@@ -24,6 +25,9 @@ export interface DebugInfo {
   noise: number;
   neonAbove: string;
   loops: number;
+  cameraDelay: number;
+  replayFrom: number | null;
+  story: string[];
 }
 
 /**
@@ -83,6 +87,8 @@ export class Debug {
       `client     ${info.shopper ? `${info.shopper.state}  x ${info.shopper.x.toFixed(1)} z ${info.shopper.z.toFixed(1)}${info.shopper.lineOfSight ? "  (en vue)" : ""}` : "absent (arrive à 01:10)"}   J : arrêt devant`,
       `bruit      ${info.noise.toFixed(1)} m      néon au-dessus : ${info.neonAbove}`,
       `boucles    ${info.loops}`,
+      `caméras    décalage ${info.cameraDelay.toFixed(1)} min · enregistré depuis ${info.replayFrom === null ? "-" : GameClock.format(info.replayFrom)}`,
+      `découvert  ${info.story.length ? info.story.join(", ") : "-"}`,
       `ancrage    ${info.anchors.map((a) => `${a.id === 0 ? "H" : a.id}:${Math.round(a.anchor * 100)}%`).join(" ")}`,
     ].join("\n");
     drawPlan(this.ctx, this.map.width, this.map.height, this.layout, {

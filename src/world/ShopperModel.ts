@@ -1,4 +1,4 @@
-import { Color4, Matrix, MeshBuilder, Quaternion, Scene, TransformNode, Vector3 } from "@babylonjs/core";
+import { Color4, Matrix, Mesh, MeshBuilder, Quaternion, Scene, TransformNode, Vector3 } from "@babylonjs/core";
 import type { Rng } from "../core/Rng";
 import type { Materials } from "./Materials";
 import { mat, textTexture } from "./Materials";
@@ -11,6 +11,7 @@ import { buildCart } from "./Props";
 export class ShopperModel {
   readonly root: TransformNode;
   private readonly legs: TransformNode[] = [];
+  private readonly headParts: Mesh[] = [];
   private phase = 0;
 
   constructor(scene: Scene, mats: Materials, rng: Rng) {
@@ -41,6 +42,7 @@ export class ShopperModel {
     hat.position.set(0, 2.02, 0.09);
     hat.material = beanie;
     hat.parent = this.root;
+    this.headParts.push(head, hat);
 
     for (const side of [-1, 1]) {
       const hip = new TransformNode("client-hanche", scene);
@@ -126,6 +128,24 @@ export class ShopperModel {
 
   setEnabled(on: boolean): void {
     this.root.setEnabled(on);
+  }
+
+  get enabled(): boolean {
+    return this.root.isEnabled(false);
+  }
+
+  /** Tête relevée, comme pour fixer quelque chose en hauteur (l'objectif d'une caméra). */
+  setLookUp(on: boolean): void {
+    for (const m of this.headParts) {
+      m.rotation.x = on ? -0.45 : 0;
+      m.position.z = on ? 0.05 : m === this.headParts[0] ? 0.1 : 0.09;
+    }
+  }
+
+  /** Recalcule toutes les matrices (après un déplacement hors de la boucle de rendu normale). */
+  refreshMatrices(): void {
+    this.root.computeWorldMatrix(true);
+    for (const n of this.root.getDescendants(false)) (n as TransformNode).computeWorldMatrix?.(true);
   }
 
   update(dt: number, x: number, z: number, bodyYaw: number, speed: number): void {

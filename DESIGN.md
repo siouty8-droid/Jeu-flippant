@@ -57,6 +57,16 @@ Deux règles d'or, toute violation est un bug bloquant :
 - **Néons** (`systems/NeonSystem.ts`) : chaque tube a son matériau. Blanc par défaut. Quand le client est arrêté ou en traque, les tubes à moins de 5,5 m de lui passent à l'**orange**, et ceux à moins de 11 m **clignotent**. Quand il fait ses courses, le tube au-dessus de lui clignote légèrement. Un réagencement par stagnation fait aussi vaciller les néons autour du joueur. Les PointLight du pool prennent la couleur et l'intensité du tube, donc toute l'allée devient orange. Chaque rallumage fait un grésillement spatialisé.
 - **Son** (`audio/`) : 100 % synthétisé en Web Audio (roulettes avec grondement, cliquetis et grincements, pas sur le carrelage, conserves, grésillements, bourdonnement des frigos). Spatialisé en HRTF. Les z sont inversés entre Babylon (main gauche) et Web Audio (main droite).
 
+## Règle 2 en pratique (étape 4)
+
+- **Enregistrement** (`systems/ReplayBuffer.ts`, testé) : toutes les 0,25 s réelles, un instantané contient l'heure de jeu, la place des rayons, Farid, le client et l'état de chaque néon. On garde 6 minutes de jeu. Un retour en arrière dans le temps (nouvelle nuit, debug) efface la suite. Un trou dans l'enregistrement affiche « PAS DE SIGNAL ».
+- **Décalage** : `cameraDelay(t)` oscille entre 2 et 4 min de jeu (sinusoïde, période 95 min). L'incrustation ne montre que `31/10 HH:MM` de l'instant rejoué, pas les secondes (elles défileraient 6,7 fois trop vite à cause de la compression du temps). Pour connaître le décalage, il faut comparer avec la montre, et rien ne dit qu'il faut le faire.
+- **Rendu** (`world/SecurityCameras.ts`) : 6 caméras au plafond, chacune avec son boîtier et sa LED rouge, et chacune rendue dans une RenderTargetTexture de 320 × 208. Juste avant le rendu d'une caméra, on remet le magasin dans l'état de l'instantané (rayons, client, néons, silhouette de Farid), puis on restaure l'état réel juste après. Les matrices sont recalculées à la main, car le rendu d'une RenderTargetTexture ne le fait pas. On ne rend les flux que quand le joueur est au poste de sécurité, une caméra par frame à tour de rôle (plus la caméra zoomée).
+- **Farid sur les caméras** : une silhouette de vigile sur un calque visible uniquement par les caméras (`CCTV_ONLY_LAYER`). Tu te vois toi-même, avec quelques minutes de retard.
+- **Effet vidéosurveillance** : shader maison (monochrome vert, scanlines, bruit, léger décalage de lignes, barre qui défile, vignette) avec l'incrustation par-dessus. Les écrans et la vue plein écran utilisent le même matériau.
+- **Interaction** : `E` sur un écran pour le plein écran, `←`/`→` (ou Q/D) pour changer de caméra, `E`/`Tab`/`Échap` pour revenir. Pendant le zoom on ne marche pas, donc on stagne. C'est voulu.
+- **Événements injectés** (`narrative/ReplayEvents.ts`) : ils modifient l'instantané pour une seule caméra. Le premier : entre 03:18 et 03:23 (heure rejouée), le client est planté devant la CAM 2 et fixe l'objectif, tête relevée. C'est la seule exception à la règle du visage, et elle est voulue : c'est un indice de la fin cachée. On ne voit pas de visage de toute façon, la tête est lisse. Si le joueur le regarde (zoom, ou devant le bureau face à l'écran), `client-objectif` est ajouté à `game.story`, qui survit aux boucles.
+
 ## Rendu
 
 - Babylon.js 9, WebGL2. Hémisphérique faible + **pool de 4 PointLight** qui se collent aux néons les plus proches. Leur intensité décroît vers le bord du pool pour éviter les « pops ».
@@ -69,7 +79,7 @@ Deux règles d'or, toute violation est un bug bloquant :
 - [x] **Étape 1 — Squelette** : Vite + TS + Babylon, contrôleur FPS, magasin gray-box piloté par `StoreLayout`, horloge, montre, debug F1 avec mini-carte, écran titre et pause.
 - [x] **Étape 2 — Règle 1 + plan** : `OcclusionMap`, `DwellTracker` (ancrage + stagnation), `ReshuffleSystem` (détour, stagnation, rayon 9), interaction `E`, photo du plan dans le téléphone (`Tab`), debug enrichi (heatmap d'ancrage, timer de stagnation, `R` pour forcer un échange), tests Vitest.
 - [x] **Étape 3 — Néons + client + boucle** : `NavGraph`, `ShopperBrain` / `ShopperModel` / `ShopperAI`, `NeonSystem`, `NoiseSystem`, audio procédural, boucle à 00:00, debug (état du client sur la mini-carte, `J` pour le mettre à l'arrêt devant soi).
-- [ ] Étape 4 — Caméras en différé (règle 2)
+- [x] **Étape 4 — Caméras en différé** : `ReplayBuffer`, `SecurityCameras` (6 flux, shader vidéosurveillance, zoom), silhouette de Farid visible seulement par les caméras, événements injectés (`client-objectif`), debug (décalage, début de l'enregistrement, découvertes).
 - [ ] Étape 5 — Portes, clés, règle 5
 - [ ] Étape 6 — Narration, Sabine, talkie
 - [ ] Étape 7 — Radio du magasin

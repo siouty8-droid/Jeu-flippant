@@ -12,6 +12,7 @@ import { DwellTracker } from "./systems/DwellTracker";
 import { Interaction } from "./systems/Interaction";
 import { NeonSystem } from "./systems/NeonSystem";
 import { NoiseSystem } from "./systems/NoiseSystem";
+import { ReplayBuffer, cameraDelay } from "./systems/ReplayBuffer";
 import { ShopperAI } from "./systems/ShopperAI";
 import { EvacuationPlan } from "./ui/EvacuationPlan";
 import { Fade } from "./ui/Fade";
@@ -21,6 +22,7 @@ import { Lighting } from "./world/Lighting";
 import { NavGraph } from "./world/NavGraph";
 import { OcclusionMap, type Eye } from "./world/Occlusion";
 import { ReshuffleSystem } from "./world/ReshuffleSystem";
+import { CAMERAS, SecurityCameras } from "./world/SecurityCameras";
 import { StoreLayout } from "./world/StoreLayout";
 import { buildWorld, type World } from "./world/WorldBuilder";
 
@@ -48,8 +50,13 @@ export class Game {
   readonly noise = new NoiseSystem(this.audio);
   readonly neons: NeonSystem;
   readonly shopper: ShopperAI;
+  readonly replay = new ReplayBuffer();
+  readonly cameras: SecurityCameras;
+  /** Ce que le joueur a découvert (fin cachée, etc.). Survit aux boucles : c'est sa mémoire à lui. */
+  readonly story = new Set<string>();
   /** Nombre de fois où la nuit a recommencé. */
   loops = 0;
+  private snapshotTimer = 0;
   private ambienceStarted = false;
   private readonly fade: Fade;
   private readonly lighting: Lighting;
@@ -89,6 +96,7 @@ export class Game {
     this.neons = new NeonSystem(this.world.neons, this.audio, this.rng.fork("neons"));
     this.shopper = new ShopperAI(this.scene, this.world.mats, new NavGraph(this.layout), this.rng.fork("client"), this.audio, this.occlusion);
     this.player = new PlayerController(this.scene, canvas, SPAWN, 0);
+    this.cameras = new SecurityCameras(this.scene, this.world, this.neons, this.shopper.model, this.replay, this.player.camera);
     this.setupPostProcess();
 
     this.hud = new Hud(uiRoot);
@@ -147,6 +155,12 @@ export class Game {
   }
 
   private setupInteractables(): void {
+    this.cameras.monitorMeshes.forEach((monitor, k) => {
+      this.interaction.register(monitor, {
+        prompt: () => `[E] Regarder la ${CAMERAS[k].name}`,
+        action: () => this.zoomCamera(k),
+      });
+    });
     this.interaction.register(this.world.planPanel, {
       prompt: () => (this.inventory.has("photo-plan") ? "[E] Reprendre le plan en photo" : "[E] Prendre le plan en photo"),
       action: () => {
@@ -157,6 +171,20 @@ export class Game {
         this.hud.showSubtitle(first ? "Clic. Le plan est dans ton téléphone. [Tab] pour le regarder." : "Clic. Nouvelle photo, même plan.", 5);
       },
     });
+  }
+
+  private zoomCamera(k: number): void {
+    this.cameras.zoom(k);
+    this.player.setEnabled(false);
+    this.interaction.enabled = false;
+  }
+
+  private unzoomCamera(): void {
+    if (this.cameras.zoomed === null) return;
+    this.cameras.unzoom();
+    const playing = this.state === "playing";
+    this.player.setEnabled(playing);
+    this.interaction.enabled = playing;
   }
 
   /** Recopie la position des modules dans la carte d'occlusion. */
@@ -189,6 +217,15 @@ export class Game {
       if (e.code === "F1") {
         e.preventDefault();
         this.bus.emit("debug:toggle", { visible: this.debug.toggle() });
+      }
+      if (this.cameras.zoomed !== null) {
+        // Vue plein écran d'une caméra : E / Tab / Échap pour revenir, ← → pour changer.
+        if (e.code === "Tab") e.preventDefault();
+        if (performance.now() - this.cameras.zoomedAt < 150 || e.repeat) return;
+        if (e.code === "KeyE" || e.code === "Tab" || e.code === "Escape") this.unzoomCamera();
+        else if (e.code === "ArrowLeft" || e.code === "KeyA") this.cameras.zoom(this.cameras.zoomed - 1);
+        else if (e.code === "ArrowRight" || e.code === "KeyD") this.cameras.zoom(this.cameras.zoomed + 1);
+        if (e.code !== "Escape") return;
       }
       if (e.code === "Tab") {
         e.preventDefault();
@@ -236,6 +273,7 @@ export class Game {
     const prev = this.state;
     this.state = next;
     const playing = next === "playing";
+    if (!playing) this.unzoomCamera();
     this.player.setEnabled(playing);
     this.interaction.enabled = playing;
     if (!playing && this.plan.isOpen) this.togglePlan();
@@ -271,6 +309,22 @@ export class Game {
     this.bus.emit("night:loop", { count: this.loops });
   }
 
+  /** Un instantané de l'état du magasin pour les caméras (règle 2). */
+  private recordSnapshot(dt: number, minutes: number): void {
+    this.snapshotTimer -= dt;
+    if (this.snapshotTimer > 0) return;
+    this.snapshotTimer = CONFIG.cameras.snapshotSeconds;
+    const p = this.player.position;
+    const b = this.shopper.brain;
+    this.replay.push({
+      t: minutes,
+      assignment: [...this.layout.assignment],
+      player: { x: p.x, z: p.z, yaw: this.player.yaw },
+      shopper: b.active ? { x: b.x, z: b.z, yaw: b.bodyYaw, state: b.state, speed: b.speed } : null,
+      neons: this.neons.captureStates(),
+    });
+  }
+
   /** Remet le magasin tel qu'il était avant minuit. */
   private resetNight(): void {
     this.clock.set(0);
@@ -284,6 +338,8 @@ export class Game {
     this.shopper.deactivate();
     this.noise.reset();
     this.inventory.clear();
+    this.replay.clear();
+    this.unzoomCamera();
     if (this.plan.isOpen) this.togglePlan();
     this.player.teleport(LOOP_SPAWN.x, LOOP_SPAWN.z, LOOP_SPAWN.yaw);
     this.player.camera.rotation.x = 0;
@@ -334,6 +390,14 @@ export class Game {
       this.shopper.update(dt, minutes, { x: eyeNow.x, y: eyeNow.y, z: eyeNow.z }, this.noise.radius);
       if (this.shopper.state === "caught") void this.loopNight();
     }
+    if (playing) this.recordSnapshot(dt, minutes);
+    const forward = this.player.camera.getDirection(Vector3.Forward());
+    for (const id of this.cameras.update(dt, minutes, zone.id === "securite", eyeNow, forward)) {
+      this.story.add(id);
+      this.bus.emit("cameras:witnessed", { id });
+    }
+    if (this.cameras.zoomed !== null) this.hud.setPrompt("[← →] changer de caméra · [E] revenir");
+
     const threat = this.shopper.brain.active ? { ...this.shopper.position, state: this.shopper.state } : null;
     this.neons.update(dt, threat, { x: p.x, z: p.z });
     this.lighting.update(this.player.position, (i) => this.neons.light(i));
@@ -358,6 +422,9 @@ export class Game {
       noise: this.noise.radius,
       neonAbove: this.neons.stateAt(p.x, p.z),
       loops: this.loops,
+      cameraDelay: cameraDelay(minutes),
+      replayFrom: this.replay.oldest,
+      story: [...this.story],
     });
   }
 }

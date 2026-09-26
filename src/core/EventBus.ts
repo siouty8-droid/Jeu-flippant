@@ -11,6 +11,7 @@ export interface GameEvents {
   "plan:photo": { minutes: number };
   "shopper:caught": Record<string, never>;
   "night:loop": { count: number };
+  "cameras:witnessed": { id: string };
 }
 
 type Handler<T> = (payload: T) => void;

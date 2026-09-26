@@ -112,6 +112,23 @@ export const CONFIG = {
     stagnationFlickerSeconds: 1.4,
   },
 
+  /** Règle 2 : les caméras montrent le passé. */
+  cameras: {
+    /** Décalage en minutes de jeu : oscille entre min et max au fil de la nuit (période en minutes). */
+    delayMinMinutes: 2,
+    delayMaxMinutes: 4,
+    delayPeriodMinutes: 95,
+    /** Un instantané de l'état du magasin toutes les N secondes réelles. */
+    snapshotSeconds: 0.25,
+    /** Ce qu'on garde en mémoire, en minutes de jeu. */
+    retentionMinutes: 6,
+    /** Résolution des flux (basse, c'est de la vidéosurveillance). */
+    feedWidth: 320,
+    feedHeight: 208,
+    /** Le joueur regarde les écrans s'il est à moins de cette distance (m) du bureau. */
+    watchDistance: 4,
+  },
+
   rendering: {
     /** Nombre de PointLight réelles qui suivent le joueur (le reste des néons est émissif). */
     lightPoolSize: 4,

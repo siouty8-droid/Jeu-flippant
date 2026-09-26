@@ -11,7 +11,7 @@ import { ShopperBrain, type ShopperState } from "./ShopperBrain";
 /** Relie le cerveau du client (logique) à son corps (3D) et à ses sons. */
 export class ShopperAI {
   readonly brain: ShopperBrain;
-  private readonly model: ShopperModel;
+  readonly model: ShopperModel;
   private rattle: CartRattle | null = null;
   private seenPickups = 0;
   private stepDistance = 0;

@@ -23,10 +23,13 @@ npm test         # tests Vitest (occlusion, réagencement, stagnation, client)
 | Souris | regarder |
 | E | interagir (ex. prendre le plan d'évacuation en photo) |
 | Tab | sortir / ranger le téléphone (photo du plan) |
+| E sur un écran du poste | vue plein écran de la caméra ; ← → pour changer, E pour revenir |
 | Échap | pause |
 | F1 | overlay de debug (mini-carte, position, zone) |
 | `[` / `]` (debug ouvert) | reculer / avancer l'horloge de 15 min |
 | R (debug ouvert) | forcer un échange de deux rayons cachés |
 | J (debug ouvert) | mettre le client à l'arrêt 9 m devant toi (néons orange ; cours pour le réveiller) |
+
+Astuce caméras : elles montrent le passé (2 à 4 min de jeu, soit 18 à 36 s réelles). Juste après un saut dans le temps en debug, elles affichent « PAS DE SIGNAL » le temps d'enregistrer assez d'historique.
 
 `http://localhost:5173/?play` démarre direct, sans écran titre ni pointer lock (pratique pour tester). En console, `window.rayon9` donne accès au jeu : `rayon9.player.teleport(18, 25, 0)`, `rayon9.clock.set(150)`…
