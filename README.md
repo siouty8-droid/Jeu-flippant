@@ -1,2 +1,28 @@
-# Jeu-flippant
-Un jeu d'horreur en babylon.js par IA
+# RAYON 9
+
+Jeu d'horreur à la première personne en Babylon.js. Supermarché « Bellevue », nuit du 30 au 31 octobre : ta collègue est enfermée dans la chambre froide, et passé minuit le magasin ne respecte plus ses propres règles.
+
+- `PROMPT_RAYON9.md` : le concept complet et le cahier des charges
+- `DESIGN.md` : les choix de design et l'avancement
+
+## Lancer le jeu
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # vérification TypeScript + build de prod dans dist/
+```
+
+## Contrôles
+
+| Touche | Action |
+|---|---|
+| ZQSD / WASD / flèches | se déplacer |
+| Maj | courir (ça s'entend) |
+| Souris | regarder |
+| E | interagir |
+| Échap | pause |
+| F1 | overlay de debug (mini-carte, position, zone) |
+| `[` / `]` (debug ouvert) | reculer / avancer l'horloge de 15 min |
+
+`http://localhost:5173/?play` démarre direct, sans écran titre ni pointer lock (pratique pour tester). En console, `window.rayon9` donne accès au jeu : `rayon9.player.teleport(18, 25, 0)`, `rayon9.clock.set(150)`…
