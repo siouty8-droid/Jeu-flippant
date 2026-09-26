@@ -1,4 +1,6 @@
 import { Color3, Color4, DefaultRenderingPipeline, Engine, Scene, Vector3 } from "@babylonjs/core";
+import { AudioEngine } from "./audio/AudioEngine";
+import { startAmbience } from "./audio/Sounds";
 import { CONFIG } from "./config";
 import { Debug } from "./core/Debug";
 import { EventBus } from "./core/EventBus";
@@ -8,19 +10,26 @@ import { Inventory } from "./player/Inventory";
 import { PlayerController } from "./player/PlayerController";
 import { DwellTracker } from "./systems/DwellTracker";
 import { Interaction } from "./systems/Interaction";
+import { NeonSystem } from "./systems/NeonSystem";
+import { NoiseSystem } from "./systems/NoiseSystem";
+import { ShopperAI } from "./systems/ShopperAI";
 import { EvacuationPlan } from "./ui/EvacuationPlan";
+import { Fade } from "./ui/Fade";
 import { Hud } from "./ui/Hud";
 import { Menu } from "./ui/Menu";
 import { Lighting } from "./world/Lighting";
+import { NavGraph } from "./world/NavGraph";
 import { OcclusionMap, type Eye } from "./world/Occlusion";
 import { ReshuffleSystem } from "./world/ReshuffleSystem";
 import { StoreLayout } from "./world/StoreLayout";
 import { buildWorld, type World } from "./world/WorldBuilder";
 
-export type GameState = "loading" | "title" | "playing" | "paused" | "ending";
+export type GameState = "loading" | "title" | "playing" | "paused" | "looping" | "ending";
 
 /** Là où Farid commence sa ronde : juste après les portes automatiques. */
 const SPAWN = new Vector3(18, 0, 2.2);
+/** Là où il se réveille quand la nuit recommence : au poste de sécurité, face à la porte. */
+const LOOP_SPAWN = { x: 3.4, z: 3.9, yaw: Math.PI / 2 };
 
 export class Game {
   readonly bus = new EventBus();
@@ -35,6 +44,14 @@ export class Game {
   readonly dwell = new DwellTracker();
   readonly occlusion: OcclusionMap;
   readonly reshuffle: ReshuffleSystem;
+  readonly audio = new AudioEngine();
+  readonly noise = new NoiseSystem(this.audio);
+  readonly neons: NeonSystem;
+  readonly shopper: ShopperAI;
+  /** Nombre de fois où la nuit a recommencé. */
+  loops = 0;
+  private ambienceStarted = false;
+  private readonly fade: Fade;
   private readonly lighting: Lighting;
   private readonly interaction: Interaction;
   private readonly hud: Hud;
@@ -69,6 +86,8 @@ export class Game {
     });
 
     this.lighting = new Lighting(this.scene, this.world.neons);
+    this.neons = new NeonSystem(this.world.neons, this.audio, this.rng.fork("neons"));
+    this.shopper = new ShopperAI(this.scene, this.world.mats, new NavGraph(this.layout), this.rng.fork("client"), this.audio, this.occlusion);
     this.player = new PlayerController(this.scene, canvas, SPAWN, 0);
     this.setupPostProcess();
 
@@ -76,11 +95,18 @@ export class Game {
     this.plan = new EvacuationPlan(uiRoot, this.layout);
     this.menu = new Menu(uiRoot, () => this.requestPlay(), () => this.requestPlay());
     this.debug = new Debug(uiRoot, this.engine, this.layout);
+    this.fade = new Fade(uiRoot);
     this.interaction = new Interaction(this.scene, this.player.camera, this.hud);
     this.setupInteractables();
 
     this.bindInput();
     this.bus.on("clock:minute", () => this.hud.setTime(this.clock.format()));
+    this.bus.on("store:reshuffle", ({ cause }) => {
+      if (cause === "stagnation") {
+        const p = this.player.position;
+        this.neons.flickerAround(p.x, p.z, CONFIG.neons.stagnationFlickerRadius, CONFIG.neons.stagnationFlickerSeconds);
+      }
+    });
     this.bus.on("zone:enter", ({ previousZoneId }) => {
       const slot = slotIndexOf(previousZoneId);
       if (slot !== null) this.reshuffle.markExited(slot);
@@ -141,13 +167,25 @@ export class Game {
     }
   }
 
+  /** L'audio ne peut démarrer qu'après un geste de l'utilisateur. */
+  private startAudio(): void {
+    this.audio.start();
+    if (this.audio.ctx && !this.ambienceStarted) {
+      this.ambienceStarted = true;
+      startAmbience(this.audio);
+    }
+  }
+
   private bindInput(): void {
+    window.addEventListener("pointerdown", () => this.startAudio());
     document.addEventListener("pointerlockchange", () => {
       const locked = document.pointerLockElement === this.canvas;
+      if (this.state === "looping") return;
       if (locked && this.state !== "playing") this.setState("playing");
       if (!locked && this.state === "playing" && !this.skipLock) this.setState("paused");
     });
     window.addEventListener("keydown", (e) => {
+      this.startAudio();
       if (e.code === "F1") {
         e.preventDefault();
         this.bus.emit("debug:toggle", { visible: this.debug.toggle() });
@@ -161,6 +199,10 @@ export class Game {
         this.hud.setTime(this.clock.format());
       }
       if (this.debug.visible && e.code === "KeyR") this.reshuffle.force();
+      if (this.debug.visible && e.code === "KeyJ") {
+        const p = this.player.position;
+        this.shopper.debugStopAhead(p.x, p.z, this.player.yaw);
+      }
       if (e.code === "Escape" && this.state === "playing" && this.skipLock) this.setState("paused");
     });
   }
@@ -179,6 +221,7 @@ export class Game {
   }
 
   private requestPlay(): void {
+    this.startAudio();
     if (this.skipLock) {
       this.setState("playing");
       return;
@@ -196,9 +239,54 @@ export class Game {
     this.player.setEnabled(playing);
     this.interaction.enabled = playing;
     if (!playing && this.plan.isOpen) this.togglePlan();
-    this.hud.setVisible(playing || next === "paused");
+    this.hud.setVisible(playing || next === "paused" || next === "looping");
     this.menu.show(next === "title" ? "title" : next === "paused" ? "pause" : next === "loading" ? "loading" : "none");
     this.bus.emit("state:change", { from: prev, to: next });
+  }
+
+  /**
+   * Le client t'a rattrapé. Pas d'animation d'attaque, pas de game over :
+   * noir, silence, et Farid se réveille au poste de sécurité à 00:00. La nuit recommence.
+   */
+  private async loopNight(): Promise<void> {
+    if (this.state === "looping") return;
+    this.setState("looping");
+    this.bus.emit("shopper:caught", {});
+    this.audio.setMuted(true, 0.3);
+    await this.fade.to(1, 0.35);
+    await wait(2200);
+
+    this.loops++;
+    this.resetNight();
+    const badge = badgeDate(this.loops);
+    this.fade.to(
+      1,
+      0.01,
+      `<div class="big">00:00</div><div>Poste de sécurité.</div><div class="small">Badge : FARID — agent de sécurité — depuis le ${badge}</div>`,
+    );
+    await wait(3200);
+    this.audio.setMuted(false, 2);
+    this.setState("playing");
+    await this.fade.to(0, 2.2);
+    this.bus.emit("night:loop", { count: this.loops });
+  }
+
+  /** Remet le magasin tel qu'il était avant minuit. */
+  private resetNight(): void {
+    this.clock.set(0);
+    this.hud.setTime(this.clock.format());
+    this.layout.assignment = [...this.layout.initialAssignment];
+    this.layout.slotChangedAt.fill(-1);
+    this.world.placeModules();
+    this.syncOcclusion();
+    this.dwell.reset();
+    this.reshuffle.reset();
+    this.shopper.deactivate();
+    this.noise.reset();
+    this.inventory.clear();
+    if (this.plan.isOpen) this.togglePlan();
+    this.player.teleport(LOOP_SPAWN.x, LOOP_SPAWN.z, LOOP_SPAWN.yaw);
+    this.player.camera.rotation.x = 0;
   }
 
   /** L'œil du joueur pour les tests de visibilité, cône élargi de la marge de sécurité. */
@@ -217,7 +305,8 @@ export class Game {
     const playing = this.state === "playing";
     if (playing) this.clock.update(dt);
     this.player.update(dt);
-    this.lighting.update(this.player.position);
+    const eyeNow = this.player.camera.position;
+    this.audio.setListener(eyeNow, this.player.camera.getDirection(Vector3.Forward()));
     this.interaction.update(dt);
     this.hud.update(dt);
 
@@ -230,11 +319,24 @@ export class Game {
     }
     this.zoneLabel = zone.label;
 
+    const minutes = this.clock.totalMinutes;
     if (playing) {
       const moduleId = zone.slot !== undefined ? this.layout.assignment[zone.slot] : null;
-      this.dwell.update(dt, p.x, p.z, moduleId, this.plan.isOpen, this.clock.totalMinutes);
-      this.reshuffle.update(dt, this.clock.totalMinutes, this.eye(), { x: p.x, z: p.z });
+      this.dwell.update(dt, p.x, p.z, moduleId, this.plan.isOpen, minutes);
+      this.reshuffle.update(dt, minutes, this.eye(), { x: p.x, z: p.z });
+      this.noise.update(dt, this.player.speed, this.player.running);
+
+      // Règle 4 : le client arrive quand Sabine est enfermée, et va d'abord au rayon des conserves.
+      if (!this.shopper.brain.active && minutes >= CONFIG.shopper.appearsAtMinutes) {
+        const conserves = this.layout.slotOfModule(3);
+        this.shopper.activate({ x: p.x, z: p.z }, conserves === -1 ? null : conserves);
+      }
+      this.shopper.update(dt, minutes, { x: eyeNow.x, y: eyeNow.y, z: eyeNow.z }, this.noise.radius);
+      if (this.shopper.state === "caught") void this.loopNight();
     }
+    const threat = this.shopper.brain.active ? { ...this.shopper.position, state: this.shopper.state } : null;
+    this.neons.update(dt, threat, { x: p.x, z: p.z });
+    this.lighting.update(this.player.position, (i) => this.neons.light(i));
 
     this.debug.update(dt, {
       seed: CONFIG.seed,
@@ -252,6 +354,10 @@ export class Game {
       swaps: this.reshuffle.swapCount,
       lastCause: this.reshuffle.lastCause,
       active: this.clock.totalMinutes >= CONFIG.reshuffle.activeFromMinutes,
+      shopper: this.shopper.brain.active ? { state: this.shopper.state, ...this.shopper.position, lineOfSight: this.shopper.lineOfSight } : null,
+      noise: this.noise.radius,
+      neonAbove: this.neons.stateAt(p.x, p.z),
+      loops: this.loops,
     });
   }
 }
@@ -259,4 +365,18 @@ export class Game {
 function slotIndexOf(zoneId: string | null): number | null {
   if (!zoneId?.startsWith("slot-")) return null;
   return Number(zoneId.slice(5));
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Date d'embauche sur le badge. La première nuit : il y a trois semaines.
+ * À chaque boucle, elle recule encore de trois semaines.
+ */
+export function badgeDate(loops: number): string {
+  const d = new Date(Date.UTC(2025, 9, 31));
+  d.setUTCDate(d.getUTCDate() - 21 * (loops + 1));
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }

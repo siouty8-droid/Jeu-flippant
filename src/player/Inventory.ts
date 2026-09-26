@@ -11,4 +11,8 @@ export class Inventory {
   add(item: ItemId): void {
     this.items.add(item);
   }
+
+  clear(): void {
+    this.items.clear();
+  }
 }

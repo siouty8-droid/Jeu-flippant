@@ -9,6 +9,8 @@ export interface GameEvents {
   "debug:toggle": { visible: boolean };
   "store:reshuffle": { slots: number[]; cause: "detour" | "stagnation" | "rayon9" | "debug" };
   "plan:photo": { minutes: number };
+  "shopper:caught": Record<string, never>;
+  "night:loop": { count: number };
 }
 
 type Handler<T> = (payload: T) => void;

@@ -60,6 +60,58 @@ export const CONFIG = {
     speedFactorWhileReading: 0.6,
   },
 
+  /** Règle 4 : l'autre client. */
+  shopper: {
+    /** Il apparaît quand Sabine se retrouve enfermée. */
+    appearsAtMinutes: 70,
+    /** Avant cette heure, il ne s'arrête jamais. 150 = 02:30. */
+    stopsFromMinutes: 150,
+    corridorSpeed: 1.0,
+    /** Dans les allées de rayon, il avance au pas en choisissant ses produits. */
+    aisleSpeed: 0.55,
+    huntSpeedStart: 2.0,
+    huntSpeedMax: 4.3,
+    /** Secondes pour passer de huntSpeedStart à huntSpeedMax. */
+    huntAcceleration: 6,
+    /** Il abandonne la traque s'il ne t'a pas entendu ni vu depuis ce temps. */
+    huntGiveUpSeconds: 8,
+    /** En dessous de cette distance (m), il t'attrape. */
+    catchDistance: 1.1,
+    /** Une « rencontre » commence quand tu passes sous cette distance ; on tire alors au sort un arrêt. */
+    encounterDistance: 20,
+    /** Chance d'arrêt par rencontre, selon l'heure (minutes → probabilité), interpolée. */
+    stopChance: [
+      [150, 0.35],
+      [240, 0.7],
+      [300, 0.9],
+    ] as [number, number][],
+    stopSecondsMin: 8,
+    stopSecondsMax: 22,
+    /** Au-delà de cet angle (degrés) entre son regard et toi, il se détourne : on ne voit jamais son visage. */
+    faceAvoidDegrees: 110,
+    turnRate: 5,
+  },
+
+  /** Bruit du joueur : rayon (m) dans lequel le client l'entend. */
+  noise: {
+    walkRadius: 2.5,
+    runRadius: 16,
+    walkStepLength: 0.75,
+    runStepLength: 1.1,
+  },
+
+  /** Règle 3 : les néons. */
+  neons: {
+    /** Client arrêté ou en traque : orange sous ce rayon (m), clignotement au-delà. */
+    orangeDistance: 5.5,
+    flickerDistance: 11,
+    /** Client qui fait ses courses : léger clignotement quand il passe dessous. */
+    shoppingFlickerDistance: 3.5,
+    /** Quand le magasin bouge à cause de la stagnation, les néons autour vacillent. */
+    stagnationFlickerRadius: 10,
+    stagnationFlickerSeconds: 1.4,
+  },
+
   rendering: {
     /** Nombre de PointLight réelles qui suivent le joueur (le reste des néons est émissif). */
     lightPoolSize: 4,

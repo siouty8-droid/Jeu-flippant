@@ -12,7 +12,7 @@ import type { NeonFixture } from "./WorldBuilder";
  */
 export class Lighting {
   private readonly pool: PointLight[] = [];
-  private readonly anchors: { pos: Vector3; cold: boolean }[] = [];
+  private readonly anchors: { pos: Vector3; cold: boolean; fixture: number }[] = [];
   private readonly scratch: { index: number; dist: number }[] = [];
 
   constructor(scene: Scene, neons: NeonFixture[]) {
@@ -22,7 +22,9 @@ export class Lighting {
     hemi.groundColor = new Color3(0.34, 0.34, 0.37);
     hemi.specular = new Color3(0.1, 0.1, 0.1);
 
-    for (const n of neons) for (const a of n.anchors) this.anchors.push({ pos: a, cold: n.cold });
+    neons.forEach((n, fixture) => {
+      for (const a of n.anchors) this.anchors.push({ pos: a, cold: n.cold, fixture });
+    });
 
     for (let i = 0; i < CONFIG.rendering.lightPoolSize; i++) {
       const l = new PointLight(`neon-lumiere-${i}`, Vector3.Zero(), scene);
@@ -34,7 +36,8 @@ export class Lighting {
     }
   }
 
-  update(player: Vector3): void {
+  /** `neon(i)` donne la couleur et la luminosité actuelles du néon i (NeonSystem). */
+  update(player: Vector3, neon?: (fixture: number) => { color: Color3; level: number }): void {
     const s = this.scratch;
     s.length = 0;
     for (let i = 0; i < this.anchors.length; i++) {
@@ -56,8 +59,10 @@ export class Lighting {
       const anchor = this.anchors[pick.index];
       light.position.copyFrom(anchor.pos);
       const t = Math.min(1, Math.max(0, (cutoff - pick.dist) / Math.max(0.001, cutoff * 0.45)));
-      light.intensity = CONFIG.rendering.lightIntensity * t * t * (3 - 2 * t);
-      if (anchor.cold) light.diffuse.set(0.7, 0.85, 1.0);
+      const state = neon?.(anchor.fixture);
+      light.intensity = CONFIG.rendering.lightIntensity * t * t * (3 - 2 * t) * (state?.level ?? 1);
+      if (state) light.diffuse.copyFrom(state.color);
+      else if (anchor.cold) light.diffuse.set(0.7, 0.85, 1.0);
       else light.diffuse.set(0.95, 0.97, 1.0);
     }
   }

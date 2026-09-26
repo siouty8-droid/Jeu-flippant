@@ -43,6 +43,16 @@ export class ReshuffleSystem {
     private readonly apply: (changedSlots: number[]) => void,
   ) {}
 
+  /** Nouvelle nuit : on oublie tout. */
+  reset(): void {
+    this.unstable.clear();
+    this.sinceEvaluation = 0;
+    this.sinceSwap = Infinity;
+    this.sinceRayon9Move = 0;
+    this.forceRequested = false;
+    this.lastCause = null;
+  }
+
   /** Le joueur vient de sortir de ce slot. */
   markExited(slotIndex: number): void {
     this.unstable.add(slotIndex);

@@ -46,6 +46,17 @@ Deux règles d'or, toute violation est un bug bloquant :
 - **Conséquence** : les rayons à étagères basses (fruits et légumes 1,45 m, boulangerie 1,95 m, comptoir de la boucherie) cachent moins bien. Depuis leur allée, on voit par-dessus les panneaux des rayons voisins, donc ces zones « ouvertes » bougent moins autour du joueur. Les hautes gondoles (2,15 m) et les frigos sont les endroits où le magasin peut vraiment changer dans ton dos.
 - Tout est piloté par `CONFIG.reshuffle` et `CONFIG.stagnation`.
 
+## Règles 3 et 4 en pratique (étape 3)
+
+- **Le client** (`systems/ShopperBrain.ts`, logique pure testée) apparaît à 01:10, le plus loin possible du joueur, et va d'abord au rayon des conserves. Il se déplace sur un graphe fixe (`world/NavGraph.ts`) : allées transversales, allées entre les colonnes, milieu de chaque allée de rayon. L'allée du présentoir Halloween est évitée.
+- **SHOPPING** : 1 m/s dans les allées transversales, au pas (0,55 m/s) dans les rayons, où il prend des conserves (tintement dans le caddie). Il ne s'arrête jamais complètement : tant que ça roule, il est inoffensif. S'il voit le joueur devant lui, il change de rayon.
+- **STOPPED** : à partir de 02:30, chaque « rencontre » (joueur à moins de 20 m) tire un arrêt au sort. La chance passe de 35 % à 02:30 à 70 % à 04:00 et 90 % à 05:00, et l'arrêt dure de 8 à 22 s, plus long en fin de nuit. Arrêté, il entend la **course (16 m)**, la **marche seulement de très près (2,5 m)**, et il réagit si on le touche. Reculer en marchant est donc silencieux. Il n'y a d'ailleurs pas de course à reculons.
+- **HUNTING** : il fonce vers le dernier bruit, de 2 à 4,3 m/s en 6 s. Il te voit à moins de 10 m s'il a une ligne de vue, et il coupe tout droit quand le sol est dégagé. Il abandonne après 8 s sans t'entendre ni te voir.
+- **Visage** : son corps se détourne dès que l'angle entre son regard et le joueur passe sous 110°. S'il est surpris de face au coin d'une allée, il est retourné d'un coup, sur la première frame où on le voit. En traque, il **recule vers toi, dos tourné**. Un test simule 5 min de ronde et vérifie à chaque frame qu'on ne voit jamais son visage.
+- **Capture** : noir, silence, puis « 00:00 — Poste de sécurité » et le badge de Farid, dont la date recule de 3 semaines à chaque boucle. Le magasin, le plan photographié, l'ancrage et le client sont remis à zéro, et le compteur de boucles augmente (il servira à la pile de badges de la fin cachée).
+- **Néons** (`systems/NeonSystem.ts`) : chaque tube a son matériau. Blanc par défaut. Quand le client est arrêté ou en traque, les tubes à moins de 5,5 m de lui passent à l'**orange**, et ceux à moins de 11 m **clignotent**. Quand il fait ses courses, le tube au-dessus de lui clignote légèrement. Un réagencement par stagnation fait aussi vaciller les néons autour du joueur. Les PointLight du pool prennent la couleur et l'intensité du tube, donc toute l'allée devient orange. Chaque rallumage fait un grésillement spatialisé.
+- **Son** (`audio/`) : 100 % synthétisé en Web Audio (roulettes avec grondement, cliquetis et grincements, pas sur le carrelage, conserves, grésillements, bourdonnement des frigos). Spatialisé en HRTF. Les z sont inversés entre Babylon (main gauche) et Web Audio (main droite).
+
 ## Rendu
 
 - Babylon.js 9, WebGL2. Hémisphérique faible + **pool de 4 PointLight** qui se collent aux néons les plus proches. Leur intensité décroît vers le bord du pool pour éviter les « pops ».
@@ -57,7 +68,7 @@ Deux règles d'or, toute violation est un bug bloquant :
 
 - [x] **Étape 1 — Squelette** : Vite + TS + Babylon, contrôleur FPS, magasin gray-box piloté par `StoreLayout`, horloge, montre, debug F1 avec mini-carte, écran titre et pause.
 - [x] **Étape 2 — Règle 1 + plan** : `OcclusionMap`, `DwellTracker` (ancrage + stagnation), `ReshuffleSystem` (détour, stagnation, rayon 9), interaction `E`, photo du plan dans le téléphone (`Tab`), debug enrichi (heatmap d'ancrage, timer de stagnation, `R` pour forcer un échange), tests Vitest.
-- [ ] Étape 3 — Néons (règle 3) + client au caddie (règle 4) + boucle
+- [x] **Étape 3 — Néons + client + boucle** : `NavGraph`, `ShopperBrain` / `ShopperModel` / `ShopperAI`, `NeonSystem`, `NoiseSystem`, audio procédural, boucle à 00:00, debug (état du client sur la mini-carte, `J` pour le mettre à l'arrêt devant soi).
 - [ ] Étape 4 — Caméras en différé (règle 2)
 - [ ] Étape 5 — Portes, clés, règle 5
 - [ ] Étape 6 — Narration, Sabine, talkie

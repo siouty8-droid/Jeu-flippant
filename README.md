@@ -11,7 +11,7 @@ Jeu d'horreur à la première personne en Babylon.js. Supermarché « Bellevue �
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # vérification TypeScript + build de prod dans dist/
-npm test         # tests Vitest (occlusion, réagencement, stagnation)
+npm test         # tests Vitest (occlusion, réagencement, stagnation, client)
 ```
 
 ## Contrôles
@@ -27,5 +27,6 @@ npm test         # tests Vitest (occlusion, réagencement, stagnation)
 | F1 | overlay de debug (mini-carte, position, zone) |
 | `[` / `]` (debug ouvert) | reculer / avancer l'horloge de 15 min |
 | R (debug ouvert) | forcer un échange de deux rayons cachés |
+| J (debug ouvert) | mettre le client à l'arrêt 9 m devant toi (néons orange ; cours pour le réveiller) |
 
 `http://localhost:5173/?play` démarre direct, sans écran titre ni pointer lock (pratique pour tester). En console, `window.rayon9` donne accès au jeu : `rayon9.player.teleport(18, 25, 0)`, `rayon9.clock.set(150)`…

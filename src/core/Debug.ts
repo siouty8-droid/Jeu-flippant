@@ -20,12 +20,16 @@ export interface DebugInfo {
   swaps: number;
   lastCause: string | null;
   active: boolean;
+  shopper: { state: string; x: number; z: number; lineOfSight: boolean } | null;
+  noise: number;
+  neonAbove: string;
+  loops: number;
 }
 
 /**
  * Overlay de debug (F1) : infos, mini-carte, raccourcis.
  * Avec l'overlay ouvert : [ et ] reculent / avancent l'horloge de 15 min,
- * R force un échange de deux slots cachés.
+ * R force un échange de deux slots cachés, J met le client à l'arrêt devant soi.
  */
 export class Debug {
   private readonly root: HTMLDivElement;
@@ -75,6 +79,10 @@ export class Debug {
       `stagnation ${info.stagnation.toFixed(1)} / ${info.stagnationThreshold.toFixed(1)} s`,
       `échanges   ${info.swaps}${info.lastCause ? `  (dernier : ${info.lastCause})` : ""}`,
       `instables  ${info.unstable.length ? info.unstable.map((s) => `slot ${s}`).join(", ") : "-"}`,
+      ``,
+      `client     ${info.shopper ? `${info.shopper.state}  x ${info.shopper.x.toFixed(1)} z ${info.shopper.z.toFixed(1)}${info.shopper.lineOfSight ? "  (en vue)" : ""}` : "absent (arrive à 01:10)"}   J : arrêt devant`,
+      `bruit      ${info.noise.toFixed(1)} m      néon au-dessus : ${info.neonAbove}`,
+      `boucles    ${info.loops}`,
       `ancrage    ${info.anchors.map((a) => `${a.id === 0 ? "H" : a.id}:${Math.round(a.anchor * 100)}%`).join(" ")}`,
     ].join("\n");
     drawPlan(this.ctx, this.map.width, this.map.height, this.layout, {
@@ -83,6 +91,7 @@ export class Debug {
       showHidden: true,
       player: { x: info.x, z: info.z, yaw: info.yaw },
       heat: info.anchors.map((a) => a.anchor),
+      shopper: info.shopper ?? undefined,
     });
   }
 }

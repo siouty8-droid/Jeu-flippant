@@ -129,3 +129,12 @@ html, body {
 @media (max-width: 640px) {
   .phone.open { bottom: 2vh; right: 50%; transform: translateX(50%); }
 }
+
+/* Fondu (boucle de la nuit) */
+.fade {
+  position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.fade-text { text-align: center; color: #c9ced3; font-size: 18px; line-height: 1.8; letter-spacing: 0.08em; }
+.fade-text .big { font-size: 34px; color: #b8f5c0; letter-spacing: 0.3em; }
+.fade-text .small { font-size: 13px; color: #6b737a; }

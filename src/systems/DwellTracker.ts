@@ -34,6 +34,13 @@ export class DwellTracker {
     }
   }
 
+  reset(): void {
+    this.moduleSeconds.clear();
+    this.hasAnchor = false;
+    this.stagnation = 0;
+    this.triggered = false;
+  }
+
   /** Seuil de stagnation (s) à une heure donnée : 8 s en début de nuit, 3 s vers 4h30. */
   static threshold(minutes: number): number {
     const c = CONFIG.stagnation;

@@ -10,6 +10,8 @@ export interface PlanOptions {
   player?: { x: number; z: number; yaw: number };
   /** Dessiner aussi ce qui n'est pas censé figurer sur le plan (rayon 9, présentoir). */
   showHidden?: boolean;
+  /** Position du client, pour le debug. */
+  shopper?: { x: number; z: number; state: string };
   /** Heatmap d'ancrage (0..1) par slot, pour le debug. */
   heat?: readonly number[];
 }
@@ -156,6 +158,14 @@ export function drawPlan(ctx: CanvasRenderingContext2D, w: number, h: number, la
     ctx.font = `bold ${Math.round(f.scale * 1.1)}px Arial`;
     ctx.textAlign = "left";
     ctx.fillText("VOUS ÊTES ICI", px + f.scale * 1.3, py - f.scale * 1.2);
+  }
+
+  if (opts.shopper) {
+    const colors: Record<string, string> = { shopping: "#8fd4ff", stopped: "#ffa640", hunting: "#ff3030", caught: "#ff3030" };
+    ctx.fillStyle = colors[opts.shopper.state] ?? "#ffffff";
+    ctx.beginPath();
+    ctx.arc(X(opts.shopper.x), Y(opts.shopper.z), Math.max(3, f.scale * 0.6), 0, Math.PI * 2);
+    ctx.fill();
   }
 
   if (opts.player) {

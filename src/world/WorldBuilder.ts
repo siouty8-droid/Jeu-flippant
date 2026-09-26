@@ -13,6 +13,8 @@ export interface NeonFixture {
   anchors: Vector3[];
   zoneId: string;
   cold: boolean;
+  /** Le tube au sol (projection xz), pour mesurer la distance à une menace. */
+  seg: { x0: number; z0: number; x1: number; z1: number };
 }
 
 export interface World {
@@ -395,7 +397,9 @@ class Builder {
         const f = (i + 0.5) / n - 0.5;
         anchors.push(new Vector3(alongZ ? x : x + f * length, y - 0.3, alongZ ? z + f * length : z));
       }
-      fixtures.push({ tube: t, anchors, zoneId, cold });
+      const half = length / 2;
+      const seg = alongZ ? { x0: x, z0: z - half, x1: x, z1: z + half } : { x0: x - half, z0: z, x1: x + half, z1: z };
+      fixtures.push({ tube: t, anchors, zoneId, cold, seg });
     };
 
     // Au-dessus de chaque allée de rayon.
