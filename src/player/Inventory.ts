@@ -5,11 +5,11 @@ export type ItemId = "photo-plan" | ItemKey | "double-froide";
 
 export const ITEM_NAMES: Record<ItemId, string> = {
   "photo-plan": "Photo du plan d'évacuation (téléphone)",
-  "cle-securite": "Clé du poste de sécurité",
-  "cle-technique": "Clé du local technique",
-  "cle-secours": "Clé des sorties de secours",
+  "cle-securite": "Clé du poste de sécurité (pastille rouge)",
+  "cle-technique": "Clé du local technique (pastille bleue)",
+  "cle-secours": "Clé des sorties de secours (pastille verte)",
   "cle-froide": "Clé de la chambre froide",
-  "double-froide": "Double de clé (chambre froide)",
+  "double-froide": "Double de clé « CH. FROIDE » (caisse de la boucherie)",
 };
 
 /** Le trousseau du vigile de nuit : une clé par porte. */

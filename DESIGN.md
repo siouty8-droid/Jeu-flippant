@@ -91,6 +91,69 @@ Deux règles d'or, toute violation est un bug bloquant :
 - **Touche T** : Farid appelle Sabine, qui répond selon la situation. C'est le système d'indices : danger immédiat, photo du plan, chemin de la réserve, porte verrouillée…
 - **06:00** : pour l'instant, un écran d'aube (sauvée ou non) puis retour au titre. Les vraies fins arrivent à l'étape 8.
 
+## Radio du magasin (étape 7)
+
+- **Composition** (`audio/Muzak.ts`, logique pure et testée) : chaque morceau est tiré d'une graine.
+  - Tempo lent (72–90 bpm), mode majeur, accords de septième un peu lounge.
+  - Nappe, piano électrique en synthèse FM, basse, vibraphone pour la mélodie, charleston et grosse caisse feutrés.
+  - Le motif de mélodie est rejoué et recalé sur les accords. Chaque note est légèrement désaccordée.
+- **Morceaux inconnus** : même instrumentation, mais :
+  - en mineur ou en phrygien ;
+  - des intervalles de travers (triton, seconde mineure) et des notes qui manquent ;
+  - un peu trop lents (58–68 bpm) et plus désaccordés, avec un pleurage de bande.
+- **Qui passe quoi** (`systems/RadioDirector.ts`, testé) :
+  - Chaque rayon du plan a son morceau, soit **8 morceaux**. Il passe dans les haut-parleurs de l'emplacement de ce rayon.
+  - Le présentoir Halloween n'est pas un rayon : il passe le morceau du rayon devant lui.
+  - Si un emplacement contient un autre rayon que sur le plan, on y entend un **morceau inconnu**, propre à cette combinaison emplacement + rayon.
+  - Dans les allées, on entend l'emplacement le plus proche, avec 1,5 m d'hystérésis pour éviter le va-et-vient.
+  - Le son est étouffé dans la réserve, le poste et le local technique. Pas de musique dans la chambre froide.
+  - **Entre 04:00 et 05:00**, tant que Sabine est enfermée, toute la radio boucle sur un seul morceau inconnu.
+- **Lecture** (`audio/StoreRadio.ts`) :
+  - Tous les morceaux tournent sur une horloge commune, comme une vraie radio : quand tu reviens dans une zone, le morceau a avancé.
+  - Changer de zone fait un fondu enchaîné de 2 s.
+  - Les notes sont programmées 400 ms en avance à chaque frame, soit environ 9 notes par seconde. En cas de retard (onglet en arrière-plan), la lecture se recale au lieu de rattraper.
+  - Le son passe par un filtre « petit haut-parleur de plafond ».
+- Sabine y fait allusion : « Six ans que j'entends les mêmes huit chansons ». Au talkie (T), elle peut aussi dire : « Si tu connais pas l'air, c'est que t'es plus là où tu crois. »
+
+## Énigmes, portage et fins (étape 8)
+
+- **Caisse de la boucherie** (`systems/ButcherRegister.ts`) :
+  - Elle est fermée par un code à 4 chiffres, fixé par la graine, donc **le même d'une boucle à l'autre** : celui qui a déjà fait la nuit le connaît.
+  - `E` ouvre un petit clavier. Taper le code fait stagner, comme tout ce qu'on lit.
+  - Le tiroir contient le double de la clé de la chambre froide.
+  - Bug corrigé au passage : depuis l'étape 1, la caisse était plantée dans la vitrine réfrigérée. La vitrine s'arrête maintenant avant le bout du comptoir, et la caisse a son afficheur client sur un mât.
+- **Le code n'existe que sur les caméras** (`narrative/ReplayEvents.ts`) :
+  - Toutes les 20 minutes de l'heure rejouée (à 10, 30 et 50, à partir de 02:30), la CAM 4 « voit » un vigile en uniforme taper le code. En direct, il n'y avait personne.
+  - La caméra affiche « ▲ MOUVEMENT », bipe au poste, puis **zoome toute seule** (PTZ, jusqu'à ×20) sur l'afficheur, où les chiffres apparaissent un par un.
+  - Pendant la scène, la caméra montre le magasin tel qu'il est sur le plan.
+  - Le vigile, c'est Farid : un indice de plus pour la fin cachée.
+  - Sabine, au talkie, donne le rythme (« à dix, à trente, à cinquante ») et la caméra (« celle du fond »). Pour tomber au bon moment, il faut lire l'horodatage des écrans, en différé.
+- **Serrure changeante** (`systems/ColdLock.ts`, testé) :
+  1. Au début, c'est un verrou neuf avec un cadenas en laiton.
+  2. Dès que Farid a le double en poche, la serrure change **hors de sa vue** : c'est maintenant celle du local technique, avec une pastille bleue. Le double ne rentre même plus.
+  3. Une serrure changée s'examine d'abord (`E`). Ensuite, `E` essaie la clé du trousseau qui correspond. Elle ne tourne que si Farid **n'a pas stagné** (plus de 2,5 s sur place, téléphone et clavier compris) **dans les 30 dernières secondes**.
+  4. Sinon, la serrure change encore dès qu'il détourne les yeux : pastille verte (sorties de secours) ou rouge (poste). Après le premier échec, Sabine explique : « Elle bouge quand t'attends… Viens direct. »
+  5. Le verrou saute, la porte s'ouvre avec `E`, et Sabine arrête de se refroidir.
+- **Porter Sabine** : `E` sur elle, par terre dans la chambre froide.
+  - Farid avance à 50 % de sa vitesse, sans pouvoir courir, et le seuil de stagnation tombe à 55 %.
+  - En vue subjective, on voit ses bras passés par-dessus les épaules de Farid. Ils sont sur un calque que les caméras ne voient pas.
+  - Elle parle à l'oreille de Farid (voix « en direct » depuis sa position) et se réchauffe doucement.
+  - **Le retour est redessiné** : le magasin converge vers un nouvel agencement, un emplacement caché à la fois, donc jamais sous les yeux du joueur. Tout change sauf **un chemin stable**, un emplacement par rangée du fond vers l'entrée, qui ne se décale que d'une colonne. Ce chemin reste comme sur le plan et y passe les morceaux connus.
+  - Le client évite les allées de ce chemin tant qu'elles sont intactes. Stagner peut les casser.
+  - L'entrée s'ouvre enfin : franchir les portes automatiques avec Sabine, c'est la fin normale.
+- **Fins** (`narrative/Endings.ts`, testé) :
+  - **Normale** : sortie avec Sabine, ou 06:00 avec Sabine dans les bras. On voit le parking au petit matin, le magasin éclairé par le jour. « Sabine s'en sort. Hypothermie, trois jours d'hôpital. Vivante. »
+  - **Le froid** : 06:00 sans l'avoir sortie. Si sa température atteint 0 avant, c'est le silence radio et elle disparaît : derrière la porte, il ne reste que sa lampe, éteinte. À l'aube, on voit la réserve, la chambre froide ouverte, vide et propre. « Personne ne se souvient de Sabine. »
+  - **Cachée** (épilogue de l'une ou l'autre fin) : il faut avoir vu le client fixer la CAM 2 en différé, **et** fouillé la pile de badges du local technique. On y trouve d'anciens vigiles (le dernier a tenu dix jours) et un badge au nom de Farid, daté de son embauche. Il y en a un de plus à chaque boucle.
+    - Dernière image : la CAM 0, une caméra qui n'existe pas, filme le poste de sécurité en différé, daté du jour de son embauche. Farid y regarde les écrans.
+    - « T'as peut-être déjà fait cette nuit. »
+- Chaque fin ramène à l'écran titre. Le compteur de boucles et les découvertes survivent (la pile de badges grossit).
+- **Accessibilité** : option « Sous-titrer les sons ». Elle affiche :
+  - [les roulettes s'arrêtent] ;
+  - [♪ un air que tu n'as jamais entendu] ;
+  - [une clenche retombe, au loin] ;
+  - [bip · mouvement sur la CAM 4].
+
 ## Performance (passe de l'étape 5/6)
 
 Mesures (logique du jeu hors rendu, par frame) : **1,73 ms → 0,27 ms**. Draw calls : **181 → 108** à l'entrée, **107 → 71** dans une allée.
@@ -125,6 +188,14 @@ Mesures (logique du jeu hors rendu, par frame) : **1,73 ms → 0,27 ms**. Draw c
 - [x] **Étape 4 — Caméras en différé** : `ReplayBuffer`, `SecurityCameras` (6 flux, shader vidéosurveillance, zoom), silhouette de Farid visible seulement par les caméras, événements injectés (`client-objectif`), debug (décalage, début de l'enregistrement, découvertes).
 - [x] **Étape 5 — Portes, clés, règle 5** : `DoorSystem`, trousseau, sorties de secours qui se reverrouillent et qui te renvoient dans le magasin, verrou de la chambre froide.
 - [x] **Étape 6 — Narration** : Sabine et les clients du début de nuit (`Npcs`), timeline (`Narrative`), talkie avec voix synthétique, touche T (indices), température, pas dans le local technique, écran d'aube provisoire. Plus la passe perf et bugs ci-dessus.
-- [ ] Étape 7 — Radio du magasin
-- [ ] Étape 8 — Énigmes, portage, fins
+- [x] **Étape 7 — Radio du magasin** : `Muzak` (composition seedée), `RadioDirector` (zone → morceau, inconnus sur les emplacements réagencés, boucle inconnue 04:00-05:00), `StoreRadio` (Web Audio, horloge commune, fondus).
+- [x] **Étape 8 — Énigmes, portage, fins** :
+  - `ButcherRegister` + clavier ;
+  - scène du code sur la CAM 4 (vigile fantôme, zoom PTZ, alerte « MOUVEMENT ») ;
+  - `ColdLock` (serrure qui change, règle des 30 s) ;
+  - portage de Sabine (bras en vue subjective, redessin final avec chemin stable, entrée ouverte) ;
+  - `Endings` (normale, froid, cachée avec la CAM 0) ;
+  - pile de badges ;
+  - sous-titres des sons ;
+  - debug (K : double, L : ouvrir la chambre froide).
 - [ ] Étape 9 — Polish

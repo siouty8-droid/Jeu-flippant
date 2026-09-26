@@ -94,6 +94,12 @@ export class Menu {
     fx.dataset.key = "effects";
     fx.addEventListener("change", () => this.update({ effects: fx.checked }));
     row("Grain et aberration", fx);
+    const cap = el("input");
+    cap.type = "checkbox";
+    cap.checked = s.captions;
+    cap.dataset.key = "captions";
+    cap.addEventListener("change", () => this.update({ captions: cap.checked }));
+    row("Sous-titrer les sons", cap);
     return details;
   }
 

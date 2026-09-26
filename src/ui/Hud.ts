@@ -8,7 +8,9 @@ export class Hud {
   private readonly subtitle: HTMLDivElement;
   private readonly prompt: HTMLDivElement;
   private readonly crosshair: HTMLDivElement;
+  private readonly caption: HTMLDivElement;
   private subtitleTimer = 0;
+  private captionTimer = 0;
 
   constructor(parent: HTMLElement) {
     this.root = el("div", "hud");
@@ -16,7 +18,8 @@ export class Hud {
     this.subtitle = el("div", "hud-subtitle");
     this.prompt = el("div", "hud-prompt");
     this.crosshair = el("div", "hud-crosshair");
-    this.root.append(this.crosshair, this.watch, this.subtitle, this.prompt);
+    this.caption = el("div", "hud-caption");
+    this.root.append(this.crosshair, this.watch, this.subtitle, this.prompt, this.caption);
     parent.append(this.root);
     this.setVisible(false);
   }
@@ -42,6 +45,13 @@ export class Hud {
     this.subtitleTimer = seconds;
   }
 
+  /** Sous-titre d'un son important (option d'accessibilité), en haut de l'écran. */
+  showCaption(text: string, seconds = 3.5): void {
+    this.caption.textContent = `[${text}]`;
+    this.caption.classList.add("visible");
+    this.captionTimer = seconds;
+  }
+
   /** Le viseur grossit quand on vise un objet. */
   setAiming(on: boolean): void {
     this.crosshair.classList.toggle("aim", on);
@@ -54,6 +64,10 @@ export class Hud {
   }
 
   update(dt: number): void {
+    if (this.captionTimer > 0) {
+      this.captionTimer -= dt;
+      if (this.captionTimer <= 0) this.caption.classList.remove("visible");
+    }
     if (this.subtitleTimer > 0) {
       this.subtitleTimer -= dt;
       if (this.subtitleTimer <= 0) this.subtitle.classList.remove("visible");

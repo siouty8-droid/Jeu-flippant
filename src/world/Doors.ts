@@ -1,4 +1,4 @@
-import { MeshBuilder, TransformNode, Vector3, type Mesh, type Scene } from "@babylonjs/core";
+import { Color3, MeshBuilder, StandardMaterial, TransformNode, Vector3, type Mesh, type Scene } from "@babylonjs/core";
 import type { AudioEngine } from "../audio/AudioEngine";
 import { boltSlide, doorClose, doorLocked, doorOpen, keyTurn } from "../audio/Sounds";
 import { CONFIG } from "../config";
@@ -26,6 +26,8 @@ export class Door {
   /** Secondes pendant lesquelles le joueur n'a pas regardé cette porte (règle 5). */
   unseen = 0;
   bolt: Mesh | null = null;
+  /** La pastille de la serrure du verrou (sa couleur dit quelle clé du trousseau y rentre). */
+  lockPlate: StandardMaterial | null = null;
 
   constructor(
     readonly def: DoorDef,
@@ -62,6 +64,8 @@ export type DoorResult = { ok: true; message?: string } | { ok: false; message: 
 export class DoorSystem {
   readonly doors = new Map<string, Door>();
   private readonly byPanel = new Map<number, Door>();
+  /** Appelé quand une sortie de secours se reverrouille hors champ (sous-titres des sons). */
+  onRelock: (() => void) | null = null;
 
   constructor(
     scene: Scene,
@@ -99,7 +103,10 @@ export class DoorSystem {
         this.decorate(scene, mats, def, panel, leafLength);
       }
       const door = new Door(def, leaves);
-      if (def.id === "froide") door.bolt = this.buildBolt(scene, mats, leaves[0], leafLength);
+      if (def.id === "froide") {
+        door.bolt = this.buildBolt(scene, mats, leaves[0], leafLength);
+        door.lockPlate = door.bolt.getChildMeshes()[0].material as StandardMaterial;
+      }
       this.doors.set(def.id, door);
       for (const l of leaves) this.byPanel.set(l.panel.uniqueId, door);
       this.applyPose(door);
@@ -175,6 +182,22 @@ export class DoorSystem {
     this.applyPose(door);
   }
 
+  /** Le verrou saute (serrure de la chambre froide ouverte) : la porte redevient une porte normale. */
+  unbolt(door: Door): void {
+    door.bolted = false;
+    door.locked = false;
+    door.bolt?.setEnabled(false);
+    boltSlide(this.audio, door.center);
+  }
+
+  /** Couleur de la pastille de la serrure du verrou. */
+  setLockColor(door: Door, hex: string): void {
+    if (!door.lockPlate) return;
+    const c = Color3.FromHexString(hex);
+    door.lockPlate.diffuseColor = c;
+    door.lockPlate.emissiveColor = c.scale(0.35);
+  }
+
   /** Nouvelle nuit : chaque porte reprend son état de départ. */
   reset(): void {
     for (const door of this.doors.values()) {
@@ -185,6 +208,8 @@ export class DoorSystem {
       door.bolt?.setEnabled(false);
       this.applyPose(door);
     }
+    const froide = this.doors.get("froide");
+    if (froide) this.setLockColor(froide, "#c9a54a");
   }
 
   /**
@@ -212,6 +237,7 @@ export class DoorSystem {
         this.setOpen(door, false, { lock: true, silent: true });
         // Le bruit vient de loin : une clenche qui retombe.
         setTimeout(() => doorClose(this.audio, door.center, true, 0.7), 150);
+        this.onRelock?.();
       }
 
       // Le joueur est passé de l'autre côté.
@@ -281,6 +307,15 @@ export class DoorSystem {
     bolt.position.set(length / 2 - 0.2, 1.25 - leaf.panel.position.y, -0.07);
     bolt.material = mats.shelfMetal;
     bolt.isPickable = false;
+    // Le cylindre de la serrure, avec sa pastille de couleur (laiton au début).
+    const lock = MeshBuilder.CreateCylinder("serrure-froide", { diameter: 0.075, height: 0.03, tessellation: 16 }, scene);
+    lock.parent = bolt;
+    lock.rotation.x = Math.PI / 2;
+    lock.position.set(-0.04, -0.075, -0.02);
+    const plate = new StandardMaterial("pastille-serrure", scene);
+    plate.specularColor = new Color3(0.4, 0.4, 0.4);
+    lock.material = plate;
+    lock.isPickable = false;
     bolt.setEnabled(false);
     return bolt;
   }

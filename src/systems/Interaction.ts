@@ -44,7 +44,7 @@ export class Interaction {
     this.current = null;
     if (this.enabled) {
       const ray = this.camera.getForwardRay(REACH);
-      const hit = this.scene.pickWithRay(ray, (m) => this.targets.has(m.uniqueId) && m.isEnabled() && m.isVisible);
+      const hit = this.scene.pickWithRay(ray, (m) => this.targets.has(m.uniqueId) && m.isEnabled() && (m.isVisible || m.metadata?.pickProxy === true));
       if (hit?.pickedMesh && hit.pickedPoint) {
         // On recule un peu le point touché pour ne pas compter l'objet lui-même comme obstacle.
         const to = hit.pickedPoint.add(ray.direction.scale(-0.12));

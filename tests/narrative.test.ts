@@ -97,4 +97,49 @@ describe("Narrative", () => {
     run(s, 80, 81);
     expect(s.lines.join(" ")).toMatch(/plan/i);
   });
+
+  it("porte ouverte : elle ne se refroidit plus, ne se fait pas re-enfermer, et Farid peut la porter", () => {
+    const s = setup();
+    run(s, 0, 72);
+    expect(s.narrative.locked).toBe(true);
+    s.doors.unbolt(s.doors.get("froide"));
+    s.narrative.onColdRoomOpened();
+    const t = s.narrative.temperature;
+    run(s, 72, 120);
+    expect(s.narrative.temperature).toBe(t);
+    expect(s.narrative.locked).toBe(false);
+    expect(s.doors.get("froide").bolted).toBe(false);
+    expect(s.narrative.canPickUp).toBe(true);
+    s.narrative.pickUp();
+    run(s, 120, 180, { player: { x: 20, z: 30 } });
+    expect(s.narrative.carried).toBe(true);
+    expect(s.narrative.temperature).toBeGreaterThan(t);
+    // Sa voix vient de l'épaule de Farid.
+    expect(s.npcs.sabine.x).toBeCloseTo(20);
+    expect(s.npcs.sabine.figure.enabled).toBe(false);
+  });
+
+  it("morte de froid : silence radio, et derrière la porte il ne reste que sa lampe", () => {
+    const s = setup();
+    run(s, 0, 72);
+    run(s, 72, 360);
+    expect(s.narrative.silent).toBe(true);
+    expect(s.npcs.sabine.figure.enabled).toBe(false);
+    expect(s.npcs.lamp.isEnabled()).toBe(true);
+    s.lines.length = 0;
+    s.narrative.onColdRoomOpened();
+    run(s, 300, 301);
+    expect(s.lines.join(" ")).toMatch(/Personne/);
+    expect(s.narrative.canPickUp).toBe(false);
+  });
+
+  it("au talkie, Sabine explique le code de la caisse quand Farid l'a trouvée fermée", () => {
+    const s = setup();
+    run(s, 0, 72);
+    s.talkie.clear();
+    s.lines.length = 0;
+    s.narrative.call(ctx(160, { hasPhoto: true, registerExamined: true, player: { x: 18, z: 30 } }));
+    run(s, 160, 162);
+    expect(s.lines.join(" ")).toMatch(/vingt minutes|caméra du fond/);
+  });
 });

@@ -18,8 +18,10 @@ export class PlayerController {
   /** Vitesse horizontale réelle de la dernière frame (m/s). */
   speed = 0;
   running = false;
-  /** Multiplicateur appliqué à la vitesse (portage, etc.). */
+  /** Multiplicateur appliqué à la vitesse (téléphone sorti). */
   speedFactor = 1;
+  /** Farid porte Sabine : plus lent, et plus de course possible. */
+  carrying = false;
 
   constructor(
     scene: Scene,
@@ -83,8 +85,8 @@ export class PlayerController {
       if (has("KeyA", "ArrowLeft")) strafe -= 1;
     }
     const moving = forward !== 0 || strafe !== 0;
-    this.running = moving && has("ShiftLeft", "ShiftRight") && forward >= 0;
-    const target = (this.running ? p.runSpeed : p.walkSpeed) * this.speedFactor;
+    this.running = moving && !this.carrying && has("ShiftLeft", "ShiftRight") && forward >= 0;
+    const target = (this.running ? p.runSpeed : p.walkSpeed) * this.speedFactor * (this.carrying ? CONFIG.carry.speedFactor : 1);
 
     const yaw = this.camera.rotation.y;
     const fx = Math.sin(yaw);

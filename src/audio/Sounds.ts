@@ -226,3 +226,25 @@ export function heavyStep(audio: AudioEngine, pos: Vec3Like): void {
   audio.tone(pos, { freq: 70, freqEnd: 45, gain: 0.3, duration: 0.12 });
   audio.burst(pos, { freq: 500, q: 1, gain: 0.2, duration: 0.07, type: "lowpass" });
 }
+
+/** Touche du clavier de la caisse. */
+export function keyBeep(audio: AudioEngine, pos: Vec3Like | null): void {
+  audio.tone(pos, { freq: 1480, gain: 0.08, duration: 0.07, type: "square" });
+}
+
+/** Code erroné. */
+export function errorBuzz(audio: AudioEngine, pos: Vec3Like | null): void {
+  audio.tone(pos, { freq: 190, gain: 0.12, duration: 0.4, type: "square" });
+}
+
+/** Le tiroir-caisse qui s'ouvre. */
+export function drawerOpen(audio: AudioEngine, pos: Vec3Like | null): void {
+  audio.tone(pos, { freq: 1568, gain: 0.1, duration: 0.5, type: "triangle" });
+  setTimeout(() => audio.tone(pos, { freq: 2093, gain: 0.08, duration: 0.7, type: "triangle" }), 110);
+  setTimeout(() => audio.burst(pos, { freq: 900, q: 1, gain: 0.4, duration: 0.18, type: "lowpass" }), 60);
+}
+
+/** Détection de mouvement sur un écran du poste : deux bips. */
+export function monitorAlarm(audio: AudioEngine, pos: Vec3Like): void {
+  for (let i = 0; i < 2; i++) setTimeout(() => audio.tone(pos, { freq: 988, gain: 0.07, duration: 0.12, type: "square" }), i * 220);
+}

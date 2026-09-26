@@ -7,11 +7,12 @@ export interface GameEvents {
   "clock:dawn": Record<string, never>;
   "zone:enter": { zoneId: string; previousZoneId: string | null };
   "debug:toggle": { visible: boolean };
-  "store:reshuffle": { slots: number[]; cause: "detour" | "stagnation" | "rayon9" | "debug" };
+  "store:reshuffle": { slots: number[]; cause: "detour" | "stagnation" | "rayon9" | "debug" | "final" };
   "plan:photo": { minutes: number };
   "shopper:caught": Record<string, never>;
   "night:loop": { count: number };
   "cameras:witnessed": { id: string };
+  "radio:unknown": { track: string };
 }
 
 type Handler<T> = (payload: T) => void;

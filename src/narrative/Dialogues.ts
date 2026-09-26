@@ -79,6 +79,7 @@ export const D = {
     S("Les pas à côté… ils s'arrêtent pas. Un, deux, trois, quatre. Et ça recommence."),
     S("J'ai mis tous les cartons autour de moi. Ça tient un peu chaud. Un peu."),
     S("Me laisse pas là. S'il te plaît."),
+    S("La radio passe des airs que je connais pas. Six ans que j'entends les mêmes huit chansons, Farid. Six ans."),
   ],
   phase3: [S("…bouge… t'arrête pas…"), S("…froid… trop…"), S("…Farid… vite…"), S("…j'entends plus… mes doigts…")],
 
@@ -94,7 +95,37 @@ export const D = {
     S("Continue. Me laisse pas. Et reste pas planté au même endroit."),
     S("Les caméras… elles montrent ce qui s'est passé avant. Compare avec ta montre."),
     S("Les néons blancs, c'est bon. Orange… c'est pas bon."),
+    S("La musique, Farid. Si tu connais pas l'air, c'est que t'es plus là où tu crois."),
   ],
+
+  callFindDouble: [S("Momo, le boucher, il a un double de tout dans sa caisse. Le rayon boucherie, Farid. Enfin… là où il est ce soir.")],
+  callRegister: [
+    S("Le code de Momo ? Il le tapait toutes les vingt minutes pour vérifier sa caisse. À dix, à trente, à cinquante. Une vraie horloge."),
+    S("…et la caméra du fond, elle voit sa caisse. Les écrans, Farid. Regarde l'heure sur les écrans."),
+  ],
+  callLockChanged: [S("C'est quoi comme serrure, maintenant ? …Essaie tes clés. Mais traîne pas devant. J'ai l'impression qu'elle aime pas qu'on attende.", "direct")],
+  callLockFailed: [S("Elle bouge quand t'attends… Viens direct. Tu marches, tu t'arrêtes pas, et tu essaies tout de suite.", "direct")],
+  callCarrying: [S("…la musique… suis celle qu'on connaît… c'est par là qu'on sort…", "direct")],
+
+  lockFailedFirst: [S("Farid ?! Je l'entends cliqueter, elle a encore changé ! …Elle bouge quand t'attends. Viens direct. Tu marches, tu t'arrêtes pas, et tu essaies tout de suite.", "direct")],
+  lockOpened: [S("…Farid ? …C'est toi… T'es venu…", "direct")],
+  pickedUp: [
+    S("…je sens plus mes pieds… Sors-moi de là…", "direct"),
+    S("…la musique, Farid… celle qu'on connaît… c'est par là qu'on sort…", "direct"),
+  ],
+  carrying: [
+    S("…t'arrête pas… il redessine tout quand tu t'arrêtes…", "direct"),
+    S("…j'entends des roulettes…", "direct"),
+    S("…cet air-là… je le connais… c'est bon…", "direct"),
+    S("…pose-moi pas, hein…", "direct"),
+    S("…on y est presque ?…", "direct"),
+  ],
+
+  innerRegisterLocked: [P("Fermée. Il faut un code à quatre chiffres.")],
+  innerRegisterOpened: [P("Le tiroir s'ouvre. Un double de clé, étiquette « CH. FROIDE ». …Qui tapait le code, sur la caméra ?")],
+  innerRegisterWrong: [P("Erreur. C'est pas ça.")],
+  innerColdRoomEmpty: [P("Personne. Juste sa lampe, par terre. Éteinte.")],
+  innerBadges: [P("Des badges d'anciens employés. Des vigiles de nuit, surtout. …Et un à mon nom.")],
 
   innerEntranceBefore: [P("Ma ronde est pas finie. Et Sabine me tuerait.")],
   innerEntranceAfter: [P("Je peux pas partir sans Sabine.")],

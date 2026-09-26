@@ -1,4 +1,4 @@
-import { MeshBuilder, type Scene } from "@babylonjs/core";
+import { Color3, MeshBuilder, StandardMaterial, type Mesh, type Scene } from "@babylonjs/core";
 import type { Rng } from "../core/Rng";
 import { Figure } from "../world/Figure";
 import type { NavGraph } from "../world/NavGraph";
@@ -85,6 +85,8 @@ export const SABINE_POST = { x: 24.0, z: 4.0, yaw: -Math.PI / 2 };
 export class NpcSystem {
   readonly sabine: Walker;
   readonly customers: { walker: Walker; leavesAt: number; leaving: boolean }[];
+  /** La lampe de Sabine, par terre dans la chambre froide quand il n'y a plus personne. */
+  readonly lamp: Mesh;
 
   constructor(
     scene: Scene,
@@ -102,6 +104,16 @@ export class NpcSystem {
       { walker: new Walker("cliente-sweat", etudiante, 1.0), leavesAt: 52, leaving: false },
     ];
     for (const c of this.customers) this.collider(scene, c.walker.figure);
+
+    this.lamp = MeshBuilder.CreateCylinder("lampe-sabine", { diameter: 0.05, height: 0.2, tessellation: 10 }, scene);
+    this.lamp.rotation.z = Math.PI / 2;
+    this.lamp.rotation.y = 0.6;
+    this.lamp.position.set(10.3, 0.03, 56.4);
+    const m = new StandardMaterial("lampe-sabine", scene);
+    m.diffuseColor = new Color3(0.12, 0.12, 0.13);
+    this.lamp.material = m;
+    this.lamp.isPickable = false;
+    this.lamp.setEnabled(false);
   }
 
   get all(): Walker[] {

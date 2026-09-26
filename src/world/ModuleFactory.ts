@@ -33,6 +33,20 @@ const STYLE_PARAMS: Record<Exclude<FixtureStyle, "fridge" | "display">, StylePar
   produce: { height: 1.45, levels: [0.3, 0.8], productW: [0.3, 0.55], productH: [0.14, 0.24], facings: [1, 2], wood: true },
 };
 
+/** Position de la caisse de la boucherie dans son module (repère local du module). */
+export const REGISTER_Z = GONDOLA_LENGTH / 2 - 0.55;
+export const REGISTER_X = GONDOLA_X - 0.2;
+export const REGISTER_DISPLAY_DX = 0.33;
+export const REGISTER_DISPLAY_Y = 1.45;
+
+export interface RegisterParts {
+  register: Mesh;
+  /** Volume invisible pour viser la caisse. */
+  proxy: Mesh;
+  /** Les deux faces de l'afficheur client (matériau posé par le jeu). */
+  displays: Mesh[];
+}
+
 export interface ModuleInstance {
   def: ModuleDef;
   root: TransformNode;
@@ -41,6 +55,8 @@ export interface ModuleInstance {
    * L'OcclusionMap s'en sert pour savoir ce que le joueur peut voir.
    */
   localBoxes: Box3[];
+  /** Boucherie : la caisse enregistreuse et son afficheur. */
+  register?: RegisterParts;
 }
 
 export class ModuleFactory {
@@ -54,6 +70,7 @@ export class ModuleFactory {
     const root = new TransformNode(`module-${def.id}`, this.scene);
     const rng = this.rng.fork(`module-${def.id}`);
     const localBoxes: Box3[] = [];
+    let register: RegisterParts | undefined;
     const products = new ProductBatch(`produits-${def.id}`, this.scene, this.mats.product);
     const block = (x: number, height: number, halfW = GONDOLA_DEPTH / 2, halfL = GONDOLA_LENGTH / 2, z = 0) =>
       localBoxes.push({ minX: x - halfW, maxX: x + halfW, minY: 0, maxY: height, minZ: z - halfL, maxZ: z + halfL });
@@ -72,7 +89,7 @@ export class ModuleFactory {
       case "butcher":
         this.gondola(def, root, -GONDOLA_X, STYLE_PARAMS.butcher, rng, products);
         block(-GONDOLA_X, STYLE_PARAMS.butcher.height);
-        this.butcherCounter(def, root, GONDOLA_X, rng, products);
+        register = this.butcherCounter(def, root, GONDOLA_X, rng, products);
         block(GONDOLA_X, 0.9);
         break;
       default:
@@ -85,7 +102,7 @@ export class ModuleFactory {
     products.finish(root);
     if (def.id !== HALLOWEEN_MODULE) this.signs(def, root);
     consolidate(root);
-    return { def, root, localBoxes };
+    return { def, root, localBoxes, register };
   }
 
   /** Gondole double face : plinthe, dos central, tablettes, joues, produits des deux côtés. */
@@ -158,42 +175,77 @@ export class ModuleFactory {
     return body;
   }
 
-  /** Boucherie : vitrine réfrigérée basse + caisse enregistreuse fermée en bout de comptoir. */
-  private butcherCounter(def: ModuleDef, root: TransformNode, x: number, rng: Rng, products: ProductBatch): void {
+  /**
+   * Boucherie : vitrine réfrigérée basse + caisse enregistreuse fermée en bout de comptoir,
+   * avec son afficheur client (le code de la caisse s'y affiche quand on le tape).
+   */
+  private butcherCounter(def: ModuleDef, root: TransformNode, x: number, rng: Rng, products: ProductBatch): RegisterParts {
     const base = MeshBuilder.CreateBox("comptoir-boucherie", { width: GONDOLA_DEPTH, height: 0.9, depth: GONDOLA_LENGTH }, this.scene);
     base.position.set(x, 0.45, 0);
     base.material = this.mats.fridgeBody;
     base.parent = root;
     base.checkCollisions = true;
 
-    const glass = MeshBuilder.CreateBox("vitrine-boucherie", { width: 0.9, height: 0.45, depth: GONDOLA_LENGTH - 0.2 }, this.scene);
-    glass.position.set(x + 0.1, 1.13, 0);
+    // La vitrine s'arrête avant le bout du comptoir : la caisse est posée à côté, pas dedans.
+    const glassEnd = GONDOLA_LENGTH / 2 - 1.1;
+    const glassLength = glassEnd + GONDOLA_LENGTH / 2 - 0.1;
+    const glassCenter = (glassEnd - (GONDOLA_LENGTH / 2 - 0.1)) / 2;
+    const glass = MeshBuilder.CreateBox("vitrine-boucherie", { width: 0.9, height: 0.45, depth: glassLength }, this.scene);
+    glass.position.set(x + 0.1, 1.13, glassCenter);
     glass.material = this.mats.glass;
     glass.parent = root;
 
-    const lamp = MeshBuilder.CreateBox("lampe-vitrine", { width: 0.9, height: 0.02, depth: GONDOLA_LENGTH - 0.3 }, this.scene);
-    lamp.position.set(x + 0.1, 1.34, 0);
+    const lamp = MeshBuilder.CreateBox("lampe-vitrine", { width: 0.9, height: 0.02, depth: glassLength - 0.1 }, this.scene);
+    lamp.position.set(x + 0.1, 1.34, glassCenter);
     lamp.material = this.mats.coldLight;
     lamp.parent = root;
 
-    for (let z = -GONDOLA_LENGTH / 2 + 0.3; z < GONDOLA_LENGTH / 2 - 0.4; z += rng.range(0.28, 0.42)) {
+    for (let z = -GONDOLA_LENGTH / 2 + 0.3; z < glassEnd - 0.2; z += rng.range(0.28, 0.42)) {
       for (const dx of [-0.2, 0.15]) {
         products.add(x + dx, 0.94, z, rng.range(0.2, 0.3), 0.06, rng.range(0.16, 0.26), rng.pick(def.palette), 1);
       }
     }
 
-    // La caisse enregistreuse (le double de la clé de la chambre froide sera dedans).
-    const register = MeshBuilder.CreateBox("caisse-boucherie", { width: 0.4, height: 0.22, depth: 0.35 }, this.scene);
-    register.position.set(x - 0.2, 1.01, GONDOLA_LENGTH / 2 - 0.3);
+    // La caisse enregistreuse, en bout de comptoir. Interactive : on ne la fusionne pas.
+    const rz = REGISTER_Z;
+    const register = MeshBuilder.CreateBox("caisse-boucherie", { width: 0.42, height: 0.2, depth: 0.4 }, this.scene);
+    register.position.set(x - 0.2, 1.0, rz);
     register.material = this.mats.darkPlastic;
     register.parent = root;
-    // Objet interactif plus tard (le double de clé est dedans) : on ne le fusionne pas.
     register.metadata = { keep: true };
-    const screen = MeshBuilder.CreateBox("ecran-caisse-boucherie", { width: 0.25, height: 0.14, depth: 0.02 }, this.scene);
-    screen.position.set(x - 0.2, 1.2, GONDOLA_LENGTH / 2 - 0.42);
-    screen.rotation.x = -0.35;
+    const screen = MeshBuilder.CreateBox("ecran-caisse-boucherie", { width: 0.03, height: 0.16, depth: 0.26 }, this.scene);
+    screen.position.set(x - 0.36, 1.2, rz);
+    screen.rotation.z = 0.35;
     screen.material = this.mats.monitorScreen;
     screen.parent = root;
+
+    // Afficheur client sur un mât, lisible des deux côtés (l'allée, et la caméra du fond).
+    const pole = MeshBuilder.CreateCylinder("mat-afficheur", { diameter: 0.035, height: 0.55 }, this.scene);
+    pole.position.set(x + REGISTER_DISPLAY_DX, 1.12, rz);
+    pole.material = this.mats.shelfMetal;
+    pole.parent = root;
+    const housing = MeshBuilder.CreateBox("boitier-afficheur", { width: 0.06, height: 0.2, depth: 0.52 }, this.scene);
+    housing.position.set(x + REGISTER_DISPLAY_DX, REGISTER_DISPLAY_Y, rz);
+    housing.material = this.mats.darkPlastic;
+    housing.parent = root;
+    const displays: Mesh[] = [];
+    for (const side of [-1, 1]) {
+      const face = MeshBuilder.CreatePlane("afficheur-client", { width: 0.46, height: 0.15 }, this.scene);
+      face.position.set(x + REGISTER_DISPLAY_DX + side * 0.032, REGISTER_DISPLAY_Y, rz);
+      // Un plan se voit depuis son -z local : on le tourne vers le côté `side`.
+      face.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      face.parent = root;
+      face.isPickable = false;
+      face.metadata = { keep: true };
+      displays.push(face);
+    }
+    // Volume invisible autour de la caisse et de son écran : plus facile à viser avec E.
+    const proxy = MeshBuilder.CreateBox("caisse-boucherie-visee", { width: 0.7, height: 0.45, depth: 0.6 }, this.scene);
+    proxy.position.set(x - 0.2, 1.1, rz);
+    proxy.parent = root;
+    proxy.isVisible = false;
+    proxy.metadata = { keep: true, pickProxy: true };
+    return { register, displays, proxy };
   }
 
   /** Présentoir Halloween qui occupe le slot vide (là où apparaîtra le rayon 9). */

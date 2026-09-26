@@ -127,12 +127,13 @@ html, body {
 .camera-flash.on { animation: flash 0.45s ease-out; }
 @keyframes flash { 0% { opacity: 0.85; } 100% { opacity: 0; } }
 @media (max-width: 640px) {
+  .keypad { right: 50%; transform: translateX(50%); top: 18%; }
   .phone.open { bottom: 2vh; right: 50%; transform: translateX(50%); }
 }
 
 /* Fondu (boucle de la nuit) */
 .fade {
-  position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none;
+  position: absolute; inset: 0; background-color: rgba(0, 0, 0, 0); pointer-events: none;
   display: flex; align-items: center; justify-content: center;
 }
 .fade-text { text-align: center; color: #c9ced3; font-size: 18px; line-height: 1.8; letter-spacing: 0.08em; }
@@ -160,3 +161,46 @@ html, body {
 .option-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; color: var(--dim); }
 .option-row input[type="range"] { width: 150px; accent-color: var(--accent); }
 .option-row select { font: inherit; background: #111316; color: var(--ink); border: 1px solid #2b2f33; padding: 3px; }
+
+/* Clavier de la caisse de la boucherie */
+.keypad {
+  position: absolute; right: 7vw; top: 30%;
+  padding: 14px 18px 12px; min-width: 280px; text-align: center;
+  background: #15181b; border: 2px solid #2f353b; border-radius: 10px;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.7);
+}
+.keypad-title { font-size: 12px; letter-spacing: 0.2em; color: #8b949e; margin-bottom: 10px; }
+.keypad-lcd { display: flex; gap: 10px; justify-content: center; padding: 10px; background: #06140a; border-radius: 4px; }
+.keypad-cell { width: 34px; font-size: 38px; font-weight: bold; color: #62ff8a; text-shadow: 0 0 8px rgba(98, 255, 138, 0.6); }
+.keypad-status { height: 18px; margin-top: 8px; font-size: 13px; letter-spacing: 0.15em; }
+.keypad.error .keypad-status { color: #ff6a5a; }
+.keypad.error .keypad-cell { color: #ff6a5a; text-shadow: 0 0 8px rgba(255, 106, 90, 0.6); }
+.keypad.ok .keypad-status { color: #62ff8a; }
+.keypad-hint { margin-top: 6px; font-size: 11px; color: #5f666d; }
+
+/* Fiche à lire (badges) */
+.note {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-1.5deg);
+  width: min(430px, 88vw); padding: 18px 20px;
+  background: #e9e4d6; color: #222; border-radius: 3px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.75);
+  font-size: 15px; line-height: 1.55;
+}
+.note-title { font-weight: bold; letter-spacing: 0.08em; margin-bottom: 8px; }
+.note-line { border-bottom: 1px dashed #b9b19c; padding: 3px 0; }
+.note-line.farid { color: #7a1010; font-weight: bold; }
+.note-hint { margin-top: 10px; font-size: 12px; color: #6b665a; text-align: right; }
+
+/* Sous-titres des sons (option d'accessibilité) */
+.hud-caption {
+  position: absolute; left: 50%; top: 14%; transform: translateX(-50%);
+  padding: 4px 10px; font-size: 15px; color: #cfd6dc; font-style: italic;
+  background: rgba(0, 0, 0, 0.45); border-radius: 3px;
+  opacity: 0; transition: opacity 0.5s;
+}
+.hud-caption.visible { opacity: 1; }
+
+/* Fins */
+.fade-text .ending { max-width: min(640px, 88vw); margin: 0 auto; color: #e3e7ea; text-shadow: 0 0 10px #000, 0 0 3px #000; }
+.fade-text .ending .small { font-size: 15px; color: #c3cad0; }
+.fade-text .hidden-ending { font-size: 22px; color: #e9ecef; letter-spacing: 0.06em; }

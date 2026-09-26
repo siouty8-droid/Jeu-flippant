@@ -23,6 +23,14 @@ export interface Snapshot {
   neons: Uint8Array;
   /** Personnages secondaires (Sabine, clients du début de nuit). */
   actors: (ActorPose & { id: string; on: boolean; sitting?: boolean })[];
+  /** Ajouts des événements injectés (jamais enregistrés en direct). */
+  ghost?: ActorPose | null;
+  /** Texte de l'afficheur de la caisse de la boucherie. */
+  register?: string;
+  /** La caméra zoome toute seule sur ce point (champ vertical `fov`, radians). */
+  ptz?: { x: number; y: number; z: number; fov: number };
+  /** Détection de mouvement : « MOUVEMENT » sur l'incrustation, bip au poste. */
+  alarm?: boolean;
 }
 
 /** Décalage des caméras (minutes de jeu) à une heure donnée : entre 2 et 4 min, jamais constant. */

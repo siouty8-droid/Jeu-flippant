@@ -22,6 +22,8 @@ export const CORRIDOR_X = [2, 12.5, 23.5, 34] as const;
 export class NavGraph {
   readonly nodes: NavNode[] = [];
   private readonly adj = new Map<number, number[]>();
+  /** Fin de nuit : allées que le client évite tant qu'elles sont comme sur le plan (le chemin sûr). */
+  readonly avoidStable = new Set<number>();
 
   constructor(private readonly layout: StoreLayout) {
     const aisleX = [...new Set(layout.slots.map((s) => s.cx))];
@@ -62,7 +64,10 @@ export class NavGraph {
   /** L'allée de ce nœud est-elle praticable avec le magasin tel qu'il est maintenant ? */
   walkable(id: number): boolean {
     const slot = this.nodes[id].slot;
-    return slot === undefined || this.layout.assignment[slot] !== HALLOWEEN_MODULE;
+    if (slot === undefined) return true;
+    const module = this.layout.assignment[slot];
+    if (this.avoidStable.has(slot) && module === this.layout.initialAssignment[slot]) return false;
+    return module !== HALLOWEEN_MODULE;
   }
 
   /** Nœud praticable le plus proche qui passe le filtre (sans filtre si aucun ne passe). */

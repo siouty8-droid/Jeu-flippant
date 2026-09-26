@@ -31,12 +31,15 @@ export interface DebugInfo {
   scale: number;
   sabine: string;
   doors: string;
+  radio: string;
+  puzzle: string;
 }
 
 /**
  * Overlay de debug (F1) : infos, mini-carte, raccourcis.
  * Avec l'overlay ouvert : [ et ] reculent / avancent l'horloge de 15 min,
- * R force un échange de deux slots cachés, J met le client à l'arrêt devant soi.
+ * R force un échange de deux slots cachés, J met le client à l'arrêt devant soi,
+ * K donne le double de la clé, L ouvre la chambre froide.
  */
 export class Debug {
   private readonly root: HTMLDivElement;
@@ -111,6 +114,8 @@ export class Debug {
       `découvert  ${info.story.length ? info.story.join(", ") : "-"}`,
       `sabine     ${info.sabine}`,
       `portes     ${info.doors}`,
+      `radio      ${info.radio}`,
+      `énigmes    ${info.puzzle}   K : double · L : ouvrir la chambre froide`,
       `ancrage    ${info.anchors.map((a) => `${a.id === 0 ? "H" : a.id}:${Math.round(a.anchor * 100)}%`).join(" ")}`,
     ].join("\n");
     drawPlan(this.ctx, this.map.width, this.map.height, this.layout, {

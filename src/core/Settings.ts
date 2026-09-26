@@ -8,10 +8,12 @@ export interface Settings {
   /** Grain et aberration chromatique. */
   effects: boolean;
   fov: number;
+  /** Sous-titrer les sons importants (roulettes qui s'arrêtent, musique inconnue…). */
+  captions: boolean;
 }
 
 const KEY = "rayon9-reglages";
-const DEFAULTS: Settings = { sensitivity: 1, volume: 0.9, quality: "moyenne", effects: true, fov: 72 };
+const DEFAULTS: Settings = { sensitivity: 1, volume: 0.9, quality: "moyenne", effects: true, fov: 72, captions: false };
 
 export function loadSettings(): Settings {
   try {

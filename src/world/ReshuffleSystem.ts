@@ -5,7 +5,7 @@ import type { DwellTracker } from "../systems/DwellTracker";
 import { isSlotHidden, type Eye, type OcclusionMap } from "./Occlusion";
 import { HALLOWEEN_MODULE, RAYON_9, type Slot, type StoreLayout } from "./StoreLayout";
 
-export type ReshuffleCause = "detour" | "stagnation" | "rayon9" | "debug";
+export type ReshuffleCause = "detour" | "stagnation" | "rayon9" | "debug" | "final";
 
 /**
  * Règle 1 : les rayons ne sont plus fixes.
@@ -32,6 +32,11 @@ export class ReshuffleSystem {
   swapCount = 0;
   lastCause: ReshuffleCause | null = null;
   private forceRequested = false;
+  /** Redessin final : l'agencement vers lequel le magasin converge, emplacement caché par emplacement caché. */
+  private target: number[] | null = null;
+  private targetTimeout = 0;
+  /** Emplacements que le détour et le rayon 9 ne touchent plus (le chemin stable de la fin). */
+  readonly protectedSlots = new Set<number>();
 
   constructor(
     private readonly layout: StoreLayout,
@@ -51,6 +56,25 @@ export class ReshuffleSystem {
     this.sinceRayon9Move = 0;
     this.forceRequested = false;
     this.lastCause = null;
+    this.target = null;
+    this.protectedSlots.clear();
+  }
+
+  /**
+   * Fin de nuit : Farid porte Sabine, le magasin se redessine entièrement. Chaque emplacement
+   * rejoint `target` dès qu'il est caché (jamais sous ses yeux). `stable` : le chemin qu'on laisse
+   * tel que sur le plan (la radio y passe les morceaux connus).
+   */
+  setTarget(target: number[], stable: number[]): void {
+    this.target = [...target];
+    this.targetTimeout = 40;
+    this.protectedSlots.clear();
+    for (const s of stable) this.protectedSlots.add(s);
+    this.unstable.clear();
+  }
+
+  get converging(): boolean {
+    return this.target !== null;
   }
 
   /** Le joueur vient de sortir de ce slot. */
@@ -75,6 +99,7 @@ export class ReshuffleSystem {
     this.sinceSwap += dt;
     this.sinceRayon9Move += dt;
     this.sinceEvaluation += dt;
+    this.targetTimeout -= dt;
     const stagnated = this.dwell.consumeTrigger();
     if (this.sinceEvaluation < 1 / CONFIG.reshuffle.evaluationsPerSecond && !stagnated) return;
     this.sinceEvaluation = 0;
@@ -86,12 +111,15 @@ export class ReshuffleSystem {
       return;
     }
 
+    if (this.target) {
+      if (this.targetTimeout <= 0 || this.target.every((m, s) => this.layout.assignment[s] === m)) this.target = null;
+    }
     const cooldownReady = this.sinceSwap >= CONFIG.reshuffle.minSecondsBetweenSwaps;
     const rayon9Due =
       minutes >= CONFIG.reshuffle.rayon9AppearsAtMinutes &&
       (this.layout.slotOfModule(RAYON_9) === -1 || this.sinceRayon9Move >= CONFIG.reshuffle.rayon9SecondsBetweenMoves);
     // Le calcul de visibilité est le plus cher : on ne le fait que si quelque chose peut bouger.
-    if (!this.forceRequested && !stagnated && !rayon9Due && !(cooldownReady && this.unstable.size > 0)) return;
+    if (!this.forceRequested && !stagnated && !rayon9Due && !this.target && !(cooldownReady && this.unstable.size > 0)) return;
     const hidden = this.hiddenSlots(eye, player);
     for (const p of avoid) for (const s of [...hidden]) if (distanceToSlot(this.layout.slots[s], p.x, p.z) < 1) hidden.delete(s);
     const cooldownOk = this.sinceSwap >= CONFIG.reshuffle.minSecondsBetweenSwaps;
@@ -101,13 +129,15 @@ export class ReshuffleSystem {
       if (this.swapNearest(hidden, player, "debug")) return;
     }
 
+    if (this.target && this.stepTowardTarget(hidden)) return;
+
     // La stagnation passe en premier : c'est la réponse directe à ce que fait le joueur.
     if (stagnated && this.swapNearest(hidden, player, "stagnation")) return;
     if (minutes >= CONFIG.reshuffle.rayon9AppearsAtMinutes && this.tryRayon9(hidden)) return;
     if (!cooldownOk) return;
 
     for (const slot of [...this.unstable]) {
-      if (!hidden.has(slot)) continue;
+      if (!hidden.has(slot) || this.protectedSlots.has(slot)) continue;
       this.unstable.delete(slot);
       const moduleId = this.layout.assignment[slot];
       const c = CONFIG.reshuffle;
@@ -118,6 +148,20 @@ export class ReshuffleSystem {
       this.swap(slot, partner, "detour");
       return;
     }
+  }
+
+  /** Un échange de plus vers l'agencement final, entre deux emplacements cachés. */
+  private stepTowardTarget(hidden: Set<number>): boolean {
+    const asg = this.layout.assignment;
+    for (const s of hidden) {
+      const want = this.target![s];
+      if (asg[s] === want) continue;
+      const other = asg.indexOf(want);
+      if (other === -1 || other === s || !hidden.has(other)) continue;
+      this.swap(s, other, "final");
+      return true;
+    }
+    return false;
   }
 
   /** Slots entièrement cachés et assez loin du joueur pour qu'on puisse y toucher. */
@@ -132,7 +176,7 @@ export class ReshuffleSystem {
 
   /** Partenaire d'échange : un autre slot caché, de préférence peu ancré. */
   private pickPartner(slot: number, hidden: Set<number>): number | null {
-    const candidates = [...hidden].filter((s) => s !== slot);
+    const candidates = [...hidden].filter((s) => s !== slot && !this.protectedSlots.has(s));
     if (candidates.length === 0) return null;
     const weights = candidates.map((s) => 1.1 - this.dwell.anchor(this.layout.assignment[s]));
     let r = this.rng.next() * weights.reduce((a, b) => a + b, 0);
@@ -162,14 +206,14 @@ export class ReshuffleSystem {
     const nineSlot = this.layout.slotOfModule(RAYON_9);
     if (nineSlot === -1) {
       const halloweenSlot = this.layout.slotOfModule(HALLOWEEN_MODULE);
-      if (halloweenSlot === -1 || !hidden.has(halloweenSlot)) return false;
+      if (halloweenSlot === -1 || !hidden.has(halloweenSlot) || this.protectedSlots.has(halloweenSlot) || this.target) return false;
       this.layout.assignment[halloweenSlot] = RAYON_9;
       this.markChanged([halloweenSlot], "rayon9");
       this.sinceRayon9Move = 0;
       return true;
     }
     // Le rayon 9 ne tient pas en place.
-    if (this.sinceRayon9Move < CONFIG.reshuffle.rayon9SecondsBetweenMoves || !hidden.has(nineSlot)) return false;
+    if (this.sinceRayon9Move < CONFIG.reshuffle.rayon9SecondsBetweenMoves || !hidden.has(nineSlot) || this.target) return false;
     const partner = this.pickPartner(nineSlot, hidden);
     if (partner === null) return false;
     this.swap(nineSlot, partner, "rayon9");
@@ -198,4 +242,46 @@ export function distanceToSlot(slot: Slot, x: number, z: number): number {
   const dx = Math.max(slot.x0 - x, 0, x - slot.x1);
   const dz = Math.max(slot.z0 - z, 0, z - slot.z1);
   return Math.hypot(dx, dz);
+}
+
+/**
+ * L'agencement de la fin de nuit : un chemin d'emplacements (un par rangée, du fond vers
+ * l'entrée, qui ne se décale que d'une colonne à la fois) reste tel que sur le plan ;
+ * tous les autres emplacements changent de rayon.
+ */
+export function finalLayout(current: readonly number[], initial: readonly number[], rng: Rng): { target: number[]; stable: number[] } {
+  const present = new Set(current);
+  const clamp = (c: number) => Math.max(0, Math.min(2, c));
+  let stable: number[] = [];
+  for (let tries = 0; tries < 60; tries++) {
+    const c2 = rng.int(0, 2);
+    const c1 = clamp(c2 + rng.int(-1, 1));
+    const c0 = clamp(c1 + rng.int(-1, 1));
+    const path = [6 + c2, 3 + c1, c0];
+    if (path.every((s) => present.has(initial[s]))) {
+      stable = path;
+      break;
+    }
+  }
+  const target: number[] = new Array(current.length).fill(-1);
+  for (const s of stable) target[s] = initial[s];
+  const restSlots = current.map((_, s) => s).filter((s) => !stable.includes(s));
+  const restModules = current.filter((m) => !stable.some((s) => initial[s] === m));
+  // Mélange jusqu'à ce qu'aucun autre emplacement ne retrouve son rayon du plan.
+  let best = restModules;
+  let bestFixed = Infinity;
+  for (let tries = 0; tries < 200 && bestFixed > 0; tries++) {
+    const shuffled = [...restModules];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = rng.int(0, i);
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const fixed = restSlots.filter((s, i) => shuffled[i] === initial[s]).length;
+    if (fixed < bestFixed) {
+      bestFixed = fixed;
+      best = shuffled;
+    }
+  }
+  restSlots.forEach((s, i) => (target[s] = best[i]));
+  return { target, stable };
 }

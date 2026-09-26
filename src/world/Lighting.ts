@@ -15,9 +15,11 @@ export class Lighting {
   private readonly anchors: { pos: Vector3; cold: boolean; fixture: number }[] = [];
   /** Réutilisé à chaque frame : pas d'allocation, pas d'à-coups du ramasse-miettes. */
   private scratch: { index: number; dist: number }[] = [];
+  private readonly hemi: HemisphericLight;
 
   constructor(scene: Scene, neons: NeonFixture[]) {
     const hemi = new HemisphericLight("ambiance", new Vector3(0, 1, 0), scene);
+    this.hemi = hemi;
     hemi.intensity = CONFIG.rendering.ambientIntensity;
     hemi.diffuse = new Color3(0.86, 0.9, 0.95);
     hemi.groundColor = new Color3(0.34, 0.34, 0.37);
@@ -36,6 +38,13 @@ export class Lighting {
       l.intensity = 0;
       this.pool.push(l);
     }
+  }
+
+  /** Le matin des fins : lumière du jour par les vitrines. */
+  setDaylight(on: boolean): void {
+    this.hemi.intensity = on ? 1.15 : CONFIG.rendering.ambientIntensity;
+    this.hemi.diffuse.set(on ? 1.0 : 0.86, on ? 0.95 : 0.9, on ? 0.86 : 0.95);
+    this.hemi.groundColor.set(on ? 0.5 : 0.34, on ? 0.48 : 0.34, on ? 0.45 : 0.37);
   }
 
   /** `neon(i)` donne la couleur et la luminosité actuelles du néon i (NeonSystem). */

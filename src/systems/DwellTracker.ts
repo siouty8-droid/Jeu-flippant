@@ -13,6 +13,8 @@ export class DwellTracker {
   /** Secondes de stagnation accumulées. */
   stagnation = 0;
   private triggered = false;
+  /** Multiplicateur du seuil (plus bas quand Farid porte Sabine). */
+  thresholdScale = 1;
 
   update(dt: number, x: number, z: number, moduleId: number | null, readingPlan: boolean, minutes: number): void {
     if (moduleId !== null) this.moduleSeconds.set(moduleId, (this.moduleSeconds.get(moduleId) ?? 0) + dt);
@@ -28,7 +30,7 @@ export class DwellTracker {
     if (moved && !readingPlan) this.stagnation = 0;
     else this.stagnation += dt;
 
-    if (minutes >= CONFIG.reshuffle.activeFromMinutes && this.stagnation >= DwellTracker.threshold(minutes)) {
+    if (minutes >= CONFIG.reshuffle.activeFromMinutes && this.stagnation >= DwellTracker.threshold(minutes) * this.thresholdScale) {
       this.triggered = true;
       this.stagnation = 0;
     }
@@ -39,6 +41,7 @@ export class DwellTracker {
     this.hasAnchor = false;
     this.stagnation = 0;
     this.triggered = false;
+    this.thresholdScale = 1;
   }
 
   /** Seuil de stagnation (s) à une heure donnée : 8 s en début de nuit, 3 s vers 4h30. */

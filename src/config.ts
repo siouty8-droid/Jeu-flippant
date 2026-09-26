@@ -152,6 +152,41 @@ export const CONFIG = {
     callCooldownSeconds: 12,
   },
 
+  /** La radio du magasin (étape 7). */
+  radio: {
+    /** Volume de la muzak, sous le reste (c'est un fond sonore). */
+    volume: 0.18,
+    crossfadeSeconds: 2.2,
+    /** Dans une allée, on ne change de zone que si l'autre est plus proche d'au moins N m. */
+    switchHysteresis: 1.5,
+    /** La radio boucle sur un morceau inconnu entre ces heures, tant que Sabine est enfermée. */
+    hauntedFromMinutes: 240,
+    hauntedToMinutes: 300,
+  },
+
+  /** Énigmes de l'étape 8. */
+  puzzles: {
+    /** Le code de la caisse de la boucherie passe sur la CAM 4 toutes les N minutes (heure rejouée), à partir de… */
+    codeEveryMinutes: 20,
+    codeFromMinutes: 150,
+    codeUntilMinutes: 350,
+    /** Durée de la scène (minutes de jeu rejouées). */
+    codeSceneMinutes: 1.6,
+    /** On a « stagné » si on reste plus de N s au même endroit… */
+    stallSeconds: 2.5,
+    /** …et la serrure de la chambre froide ne s'ouvre que sans stagnation depuis N s. */
+    lockCleanSeconds: 30,
+  },
+
+  /** Porter Sabine (étape 8). */
+  carry: {
+    speedFactor: 0.5,
+    /** Multiplicateur du seuil de stagnation. */
+    stagnationFactor: 0.55,
+    /** Sa température remonte (sur 100, par heure de jeu). */
+    warmingPerHour: 12,
+  },
+
   rendering: {
     /** Nombre de PointLight réelles qui suivent le joueur (le reste des néons est émissif). */
     lightPoolSize: 4,
