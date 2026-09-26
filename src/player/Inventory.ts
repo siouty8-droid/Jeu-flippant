@@ -1,8 +1,26 @@
-/** Ce que Farid a sur lui. Les clés arriveront à l'étape 5. */
-export type ItemId = "photo-plan";
+import type { ItemKey } from "../world/StoreLayout";
+
+/** Ce que Farid a sur lui. */
+export type ItemId = "photo-plan" | ItemKey | "double-froide";
+
+export const ITEM_NAMES: Record<ItemId, string> = {
+  "photo-plan": "Photo du plan d'évacuation (téléphone)",
+  "cle-securite": "Clé du poste de sécurité",
+  "cle-technique": "Clé du local technique",
+  "cle-secours": "Clé des sorties de secours",
+  "cle-froide": "Clé de la chambre froide",
+  "double-froide": "Double de clé (chambre froide)",
+};
+
+/** Le trousseau du vigile de nuit : une clé par porte. */
+const TROUSSEAU: ItemId[] = ["cle-securite", "cle-technique", "cle-secours", "cle-froide"];
 
 export class Inventory {
   private readonly items = new Set<ItemId>();
+
+  constructor() {
+    this.startNight();
+  }
 
   has(item: ItemId): boolean {
     return this.items.has(item);
@@ -12,7 +30,13 @@ export class Inventory {
     this.items.add(item);
   }
 
-  clear(): void {
+  /** Début de nuit : juste le trousseau. */
+  startNight(): void {
     this.items.clear();
+    for (const k of TROUSSEAU) this.items.add(k);
+  }
+
+  list(): ItemId[] {
+    return [...this.items];
   }
 }

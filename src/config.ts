@@ -129,6 +129,29 @@ export const CONFIG = {
     watchDistance: 4,
   },
 
+  /** Règle 5 : le magasin veut garder son monde. */
+  doors: {
+    /** Une sortie de secours ouverte se referme et se reverrouille après N s sans être regardée. */
+    emergencyRelockSeconds: 4,
+  },
+
+  /** Sabine dans la chambre froide. */
+  sabine: {
+    /** Heure où elle part vérifier le stock (01:05) et heure à partir de laquelle la porte peut claquer (01:10). */
+    leavesAtMinutes: 65,
+    lockedAtMinutes: 70,
+    walkSpeed: 1.35,
+    /** Perte de température (sur 100) par heure de jeu, avant et après 04:00. */
+    coolingPerHour: 16,
+    coolingPerHourLate: 30,
+    lateFromMinutes: 240,
+    /** Intervalle entre deux messages spontanés au talkie (secondes réelles). */
+    chatterMinSeconds: 35,
+    chatterMaxSeconds: 70,
+    /** Délai minimal entre deux appels du joueur (touche T). */
+    callCooldownSeconds: 12,
+  },
+
   rendering: {
     /** Nombre de PointLight réelles qui suivent le joueur (le reste des néons est émissif). */
     lightPoolSize: 4,

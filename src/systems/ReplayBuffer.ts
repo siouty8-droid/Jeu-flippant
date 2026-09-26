@@ -21,6 +21,8 @@ export interface Snapshot {
   shopper: (ActorPose & { state: ShopperState; speed: number; lookAtLens?: boolean }) | null;
   /** État de chaque néon : 0 blanc, 1 clignotement, 2 orange. */
   neons: Uint8Array;
+  /** Personnages secondaires (Sabine, clients du début de nuit). */
+  actors: (ActorPose & { id: string; on: boolean; sitting?: boolean })[];
 }
 
 /** Décalage des caméras (minutes de jeu) à une heure donnée : entre 2 et 4 min, jamais constant. */
@@ -79,6 +81,10 @@ export class ReplayBuffer {
       t,
       assignment: k < 0.5 ? a.assignment : b.assignment,
       neons: k < 0.5 ? a.neons : b.neons,
+      actors: b.actors.map((ba) => {
+        const aa = a.actors.find((x) => x.id === ba.id);
+        return aa && aa.on && ba.on ? { ...ba, ...lerpPose(aa, ba, k) } : k < 0.5 && aa ? aa : ba;
+      }),
       player: lerpPose(a.player, b.player, k),
       shopper: a.shopper && b.shopper ? { ...lerpPose(a.shopper, b.shopper, k), state: b.shopper.state, speed: b.shopper.speed } : (k < 0.5 ? a.shopper : b.shopper),
     };

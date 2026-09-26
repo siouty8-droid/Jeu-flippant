@@ -1,7 +1,8 @@
-import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial, Texture, Vector3 } from "@babylonjs/core";
+import { Color3, Mesh, MeshBuilder, Scene, StandardMaterial, Texture, TransformNode, Vector3 } from "@babylonjs/core";
 import { Rng } from "../core/Rng";
 import { drawPlan } from "../ui/PlanRenderer";
 import { createMaterials, mat, textTexture, type Materials } from "./Materials";
+import { consolidate } from "./Merge";
 import { ModuleFactory, type ModuleInstance } from "./ModuleFactory";
 import { buildCart } from "./Props";
 import { MODULES, STORE, wallPieces, type StoreLayout, type Wall, type WallMaterial } from "./StoreLayout";
@@ -169,25 +170,20 @@ class Builder {
 
     for (const d of this.layout.doors.filter((door) => door.kind === "emergency")) {
       const alongX = d.wallAxis === "x";
-      // Normale vers l'intérieur du bâtiment.
-      const inward = alongX ? new Vector3(0, 0, d.z > 1 ? -1 : 1) : new Vector3(d.x > 1 ? -1 : 1, 0, 0);
-      const door = this.box(this.mats.emergencyDoor, alongX ? d.width : 0.06, d.height, alongX ? 0.06 : d.width, d.x, d.height / 2, d.z);
-      door.name = `porte-${d.id}`;
-      const barPos = new Vector3(d.x, 1.0, d.z).addInPlace(inward.scale(0.1));
-      const bar = this.box(this.mats.darkPlastic, alongX ? d.width * 0.8 : 0.05, 0.06, alongX ? 0.05 : d.width * 0.8, barPos.x, barPos.y, barPos.z, false);
-      bar.name = `barre-${d.id}`;
-
+      // Normale vers l'intérieur du bâtiment (l'opposé du sens d'ouverture).
+      const inward = alongX ? new Vector3(0, 0, -d.openTo) : new Vector3(-d.openTo, 0, 0);
       const sign = MeshBuilder.CreatePlane(`panneau-${d.id}`, { width: 1.0, height: 0.25 }, this.scene);
       const sp = new Vector3(d.x, d.height + 0.3, d.z).addInPlace(inward.scale(0.12));
       sign.position.copyFrom(sp);
       // Le plan est visible depuis -z local : on l'oriente vers l'intérieur.
       sign.rotation.y = Math.atan2(-inward.x, -inward.z);
       sign.material = signMat;
+      sign.isPickable = false;
     }
   }
 
   roomDoorFrames(): void {
-    for (const d of this.layout.doors.filter((door) => door.kind === "room")) {
+    for (const d of this.layout.doors.filter((door) => door.kind === "room" || door.kind === "emergency")) {
       const alongX = d.wallAxis === "x";
       const t = STORE.wallThickness + 0.04;
       for (const s of [-1, 1]) {
@@ -196,11 +192,6 @@ class Builder {
       }
       this.staticBox(this.mats.darkPlastic, alongX ? d.width + 0.12 : t, 0.08, alongX ? t : d.width + 0.12, d.x, d.height + 0.04, d.z, false);
     }
-    // Porte lourde de la chambre froide, restée ouverte pour l'instant (les portes arrivent à l'étape 5).
-    const froide = this.layout.doors.find((d) => d.id === "froide")!;
-    const slab = this.box(this.mats.fridgeBody, 0.12, froide.height, froide.width, froide.x + froide.width / 2 + 0.1, froide.height / 2, froide.z - froide.width / 2 - 0.05);
-    slab.rotation.y = Math.PI / 2;
-    slab.name = "porte-chambre-froide";
   }
 
   entrance(): void {
@@ -221,12 +212,15 @@ class Builder {
     for (const x of [16.3, 19.7]) {
       this.staticBox(this.mats.shelfMetal, 0.12, 1.6, 0.5, x, 0.8, 1.2, true);
     }
-    // Caddies rangés près de l'entrée.
+    // Caddies rangés près de l'entrée (fusionnés : 2 draw calls au lieu de 12).
+    const parked = new TransformNode("caddies-ranges", this.scene);
     for (let i = 0; i < 4; i++) {
       const cart = buildCart(this.scene, this.mats, `caddie-range-${i}`);
+      cart.parent = parked;
       cart.position.set(10.5, 0, 1.4 + i * 0.28);
       cart.rotation.y = Math.PI;
     }
+    consolidate(parked);
     // Butée des caddies.
     this.staticBox(this.mats.shelfMetal, 0.7, 0.05, 1.4, 10.5, 1.0, 1.8, true);
   }

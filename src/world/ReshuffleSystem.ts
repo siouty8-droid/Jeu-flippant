@@ -68,7 +68,10 @@ export class ReshuffleSystem {
     this.sinceEvaluation = Infinity;
   }
 
-  update(dt: number, minutes: number, eye: Eye, player: { x: number; z: number }): void {
+  /**
+   * @param avoid positions à ne jamais recouvrir d'un nouveau rayon (le client, les PNJ)
+   */
+  update(dt: number, minutes: number, eye: Eye, player: { x: number; z: number }, avoid: readonly { x: number; z: number }[] = []): void {
     this.sinceSwap += dt;
     this.sinceRayon9Move += dt;
     this.sinceEvaluation += dt;
@@ -83,7 +86,14 @@ export class ReshuffleSystem {
       return;
     }
 
+    const cooldownReady = this.sinceSwap >= CONFIG.reshuffle.minSecondsBetweenSwaps;
+    const rayon9Due =
+      minutes >= CONFIG.reshuffle.rayon9AppearsAtMinutes &&
+      (this.layout.slotOfModule(RAYON_9) === -1 || this.sinceRayon9Move >= CONFIG.reshuffle.rayon9SecondsBetweenMoves);
+    // Le calcul de visibilité est le plus cher : on ne le fait que si quelque chose peut bouger.
+    if (!this.forceRequested && !stagnated && !rayon9Due && !(cooldownReady && this.unstable.size > 0)) return;
     const hidden = this.hiddenSlots(eye, player);
+    for (const p of avoid) for (const s of [...hidden]) if (distanceToSlot(this.layout.slots[s], p.x, p.z) < 1) hidden.delete(s);
     const cooldownOk = this.sinceSwap >= CONFIG.reshuffle.minSecondsBetweenSwaps;
 
     if (this.forceRequested) {

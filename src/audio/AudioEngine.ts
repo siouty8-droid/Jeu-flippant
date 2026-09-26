@@ -14,6 +14,8 @@ export class AudioEngine {
   ctx: AudioContext | null = null;
   master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  private volume = 0.9;
+  private muted = false;
 
   /** À appeler depuis un geste utilisateur (clic, touche) : les navigateurs bloquent l'audio sinon. */
   start(): void {
@@ -27,7 +29,7 @@ export class AudioEngine {
       return;
     }
     this.master = this.ctx.createGain();
-    this.master.gain.value = 0.9;
+    this.master.gain.value = this.muted ? 0 : this.volume;
     this.master.connect(this.ctx.destination);
     const len = this.ctx.sampleRate * 2;
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -45,8 +47,14 @@ export class AudioEngine {
 
   /** Coupe ou rétablit tout le son (fondu). */
   setMuted(muted: boolean, seconds = 0.4): void {
+    this.muted = muted;
     if (!this.ctx || !this.master) return;
-    this.master.gain.setTargetAtTime(muted ? 0 : 0.9, this.ctx.currentTime, seconds / 3);
+    this.master.gain.setTargetAtTime(muted ? 0 : this.volume, this.ctx.currentTime, seconds / 3);
+  }
+
+  setVolume(v: number): void {
+    this.volume = v;
+    if (this.ctx && this.master && !this.muted) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
   }
 
   setListener(pos: Vec3Like, forward: Vec3Like): void {

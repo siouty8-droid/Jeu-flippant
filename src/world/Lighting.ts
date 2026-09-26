@@ -13,7 +13,8 @@ import type { NeonFixture } from "./WorldBuilder";
 export class Lighting {
   private readonly pool: PointLight[] = [];
   private readonly anchors: { pos: Vector3; cold: boolean; fixture: number }[] = [];
-  private readonly scratch: { index: number; dist: number }[] = [];
+  /** Réutilisé à chaque frame : pas d'allocation, pas d'à-coups du ramasse-miettes. */
+  private scratch: { index: number; dist: number }[] = [];
 
   constructor(scene: Scene, neons: NeonFixture[]) {
     const hemi = new HemisphericLight("ambiance", new Vector3(0, 1, 0), scene);
@@ -25,6 +26,7 @@ export class Lighting {
     neons.forEach((n, fixture) => {
       for (const a of n.anchors) this.anchors.push({ pos: a, cold: n.cold, fixture });
     });
+    this.scratch = this.anchors.map((_, index) => ({ index, dist: 0 }));
 
     for (let i = 0; i < CONFIG.rendering.lightPoolSize; i++) {
       const l = new PointLight(`neon-lumiere-${i}`, Vector3.Zero(), scene);
@@ -39,12 +41,11 @@ export class Lighting {
   /** `neon(i)` donne la couleur et la luminosité actuelles du néon i (NeonSystem). */
   update(player: Vector3, neon?: (fixture: number) => { color: Color3; level: number }): void {
     const s = this.scratch;
-    s.length = 0;
-    for (let i = 0; i < this.anchors.length; i++) {
-      const a = this.anchors[i].pos;
+    for (const e of s) {
+      const a = this.anchors[e.index].pos;
       const dx = a.x - player.x;
       const dz = a.z - player.z;
-      s.push({ index: i, dist: Math.sqrt(dx * dx + dz * dz) });
+      e.dist = Math.sqrt(dx * dx + dz * dz);
     }
     s.sort((a, b) => a.dist - b.dist);
     const n = this.pool.length;

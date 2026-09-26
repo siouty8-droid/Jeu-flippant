@@ -140,7 +140,17 @@ export interface DoorDef {
   wallAxis: "x" | "z";
   width: number;
   height: number;
+  /** Sens d'ouverture, le long de la normale au mur (+1 : vers +z ou +x). */
+  openTo: 1 | -1;
+  /** Clé du trousseau qui l'ouvre (null : pas de serrure). */
+  key: ItemKey | null;
+  /** Deux battants (double porte de la réserve). */
+  double?: boolean;
+  /** Ouverte au début de la nuit. */
+  startsOpen?: boolean;
 }
+
+export type ItemKey = "cle-technique" | "cle-secours" | "cle-froide" | "cle-securite";
 
 export interface Zone {
   id: string;
@@ -234,14 +244,14 @@ export class StoreLayout {
     ];
 
     this.doors = [
-      { id: "secours-ouest", kind: "emergency", label: "Sortie de secours (côté boulangerie)", x: 0, z: 28.5, wallAxis: "z", width: 1.2, height: D },
-      { id: "secours-est", kind: "emergency", label: "Sortie de secours (côté boissons)", x: 36, z: 28.5, wallAxis: "z", width: 1.2, height: D },
-      { id: "secours-reserve", kind: "emergency", label: "Sortie de secours (réserve)", x: 30.6, z: 59, wallAxis: "x", width: 1.2, height: D },
-      { id: "entree", kind: "entrance", label: "Entrée", x: 18, z: 0, wallAxis: "x", width: 4, height: 2.6 },
-      { id: "technique", kind: "room", label: "Local technique", x: 3.6, z: 49, wallAxis: "x", width: 1.2, height: D },
-      { id: "reserve", kind: "room", label: "Réserve", x: 23.5, z: 49, wallAxis: "x", width: 3, height: 2.6 },
-      { id: "froide", kind: "room", label: "Chambre froide", x: 14, z: 53.65, wallAxis: "z", width: 1.3, height: D },
-      { id: "securite", kind: "room", label: "Poste de sécurité", x: 6, z: 3.95, wallAxis: "z", width: 1.1, height: D },
+      { id: "secours-ouest", kind: "emergency", label: "Sortie de secours", x: 0, z: 28.5, wallAxis: "z", width: 1.2, height: D, openTo: -1, key: "cle-secours" },
+      { id: "secours-est", kind: "emergency", label: "Sortie de secours", x: 36, z: 28.5, wallAxis: "z", width: 1.2, height: D, openTo: 1, key: "cle-secours" },
+      { id: "secours-reserve", kind: "emergency", label: "Sortie de secours", x: 30.6, z: 59, wallAxis: "x", width: 1.2, height: D, openTo: 1, key: "cle-secours" },
+      { id: "entree", kind: "entrance", label: "Entrée", x: 18, z: 0, wallAxis: "x", width: 4, height: 2.6, openTo: -1, key: null },
+      { id: "technique", kind: "room", label: "Local technique", x: 3.6, z: 49, wallAxis: "x", width: 1.2, height: D, openTo: 1, key: "cle-technique" },
+      { id: "reserve", kind: "room", label: "Réserve", x: 23.5, z: 49, wallAxis: "x", width: 3, height: 2.6, openTo: 1, key: null, double: true, startsOpen: true },
+      { id: "froide", kind: "room", label: "Chambre froide", x: 14, z: 53.65, wallAxis: "z", width: 1.3, height: D, openTo: 1, key: "cle-froide" },
+      { id: "securite", kind: "room", label: "Poste de sécurité", x: 6, z: 3.95, wallAxis: "z", width: 1.1, height: D, openTo: -1, key: null, startsOpen: true },
     ];
   }
 

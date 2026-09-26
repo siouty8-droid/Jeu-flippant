@@ -30,6 +30,8 @@ interface OwnedBox extends Box3 {
 export class OcclusionMap {
   private readonly staticBoxes: OwnedBox[] = [];
   private readonly moduleBoxes = new Map<number, OwnedBox[]>();
+  /** Volumes qui apparaissent et disparaissent (portes fermées). */
+  private readonly dynamicBoxes = new Map<string, OwnedBox>();
 
   constructor(layout: StoreLayout, extraStatic: Box3[] = []) {
     for (const wall of layout.walls) {
@@ -58,9 +60,16 @@ export class OcclusionMap {
     );
   }
 
+  /** Ajoute ou retire (null) un volume dynamique, par exemple une porte fermée. */
+  setDynamic(key: string, box: Box3 | null): void {
+    if (box) this.dynamicBoxes.set(key, { ...box, owner: null });
+    else this.dynamicBoxes.delete(key);
+  }
+
   /** Vrai si un volume (autre que ceux du module `ignoreOwner`) coupe le segment a → b. */
   blocked(a: Vec3, b: Vec3, ignoreOwner: number | null = null): boolean {
     for (const box of this.staticBoxes) if (segmentHitsBox(a, b, box)) return true;
+    for (const box of this.dynamicBoxes.values()) if (segmentHitsBox(a, b, box)) return true;
     for (const [owner, boxes] of this.moduleBoxes) {
       if (owner === ignoreOwner) continue;
       for (const box of boxes) if (segmentHitsBox(a, b, box)) return true;

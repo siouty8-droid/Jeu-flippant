@@ -262,7 +262,10 @@ export class ShopperBrain {
     const end = this.graph.nearest(target.x, target.z);
     const nodes = this.graph.path(start.id, end.id);
     const pts: Point[] = nodes.map((id) => ({ x: this.graph.nodes[id].x, z: this.graph.nodes[id].z }));
-    if (!("id" in target)) pts.push({ x: target.x, z: target.z });
+    // Point final hors du graphe (le joueur) : seulement s'il est accessible en ligne droite
+    // depuis le dernier nœud. Sinon il s'arrête au nœud : il ne traverse ni mur ni porte fermée.
+    const last = pts[pts.length - 1];
+    if (!("id" in target) && (!last || this.isClear(last.x, last.z, target.x, target.z))) pts.push({ x: target.x, z: target.z });
     // Pas de retour en arrière : si l'étape suivante est accessible en ligne droite, on saute la première.
     while (pts.length >= 2 && this.isClear(this.x, this.z, pts[1].x, pts[1].z)) pts.shift();
     return pts;

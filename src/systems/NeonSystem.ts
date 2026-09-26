@@ -1,4 +1,4 @@
-import { Color3, type StandardMaterial } from "@babylonjs/core";
+import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, type Mesh, type Scene } from "@babylonjs/core";
 import type { AudioEngine } from "../audio/AudioEngine";
 import { neonCrackle } from "../audio/Sounds";
 import { CONFIG } from "../config";
@@ -20,7 +20,6 @@ const ORANGE = new Color3(1.0, 0.5, 0.12);
 
 interface Tube {
   fixture: NeonFixture;
-  material: StandardMaterial;
   state: NeonState;
   /** Luminosité actuelle, 0..1. */
   level: number;
@@ -37,18 +36,45 @@ interface Tube {
  */
 export class NeonSystem {
   private readonly tubes: Tube[];
+  /** Tous les tubes en un seul mesh à instances fines : une draw call, une couleur par tube. */
+  private readonly mesh: Mesh;
+  private readonly colors: Float32Array;
+  private saved: Float32Array | null = null;
 
   constructor(
+    scene: Scene,
     neons: NeonFixture[],
     private readonly audio: AudioEngine,
     private readonly rng: Rng,
   ) {
-    this.tubes = neons.map((fixture, i) => {
-      // Chaque tube a son propre matériau pour changer de couleur indépendamment.
-      const material = (fixture.tube.material as StandardMaterial).clone(`neon-${i}`) as StandardMaterial;
-      fixture.tube.material = material;
-      return { fixture, material, state: "white", level: 1, flickerTimer: 0, crackleCooldown: 0, forcedFlicker: 0 };
+    this.tubes = neons.map((fixture) => ({ fixture, state: "white", level: 1, flickerTimer: 0, crackleCooldown: 0, forcedFlicker: 0 }));
+
+    const material = new StandardMaterial("neons", scene);
+    // Sans éclairage, seule l'émissive compte ; elle est multipliée par la couleur de chaque tube.
+    material.disableLighting = true;
+    material.diffuseColor = new Color3(0, 0, 0);
+    material.emissiveColor = new Color3(1, 1, 1);
+    material.specularColor = new Color3(0, 0, 0);
+    this.mesh = MeshBuilder.CreateBox("neons", { size: 1 }, scene);
+    this.mesh.material = material;
+    this.mesh.isPickable = false;
+    const matrices = new Float32Array(neons.length * 16);
+    neons.forEach((n, i) => {
+      const t = n.tube;
+      const size = t.getBoundingInfo().boundingBox.extendSize.scale(2);
+      Matrix.Compose(size, Quaternion.Identity(), t.position.clone()).copyToArray(matrices, i * 16);
+      t.dispose();
     });
+    this.colors = new Float32Array(neons.length * 4).fill(1);
+    this.mesh.thinInstanceSetBuffer("matrix", matrices, 16, true);
+    this.mesh.thinInstanceSetBuffer("color", this.colors, 4, false);
+    this.mesh.thinInstanceRefreshBoundingInfo(false);
+  }
+
+  private setColor(i: number, c: Color3, level: number): void {
+    this.colors[i * 4] = c.r * level;
+    this.colors[i * 4 + 1] = c.g * level;
+    this.colors[i * 4 + 2] = c.b * level;
   }
 
   /** Fait vaciller les néons autour d'un point (le magasin vient de bouger à cause de la stagnation). */
@@ -79,23 +105,22 @@ export class NeonSystem {
     return Uint8Array.from(this.tubes, (t) => (t.state === "orange" ? 2 : t.state === "flicker" ? 1 : 0));
   }
 
-  private saved: Color3[] | null = null;
-
   /** Applique temporairement des états passés (rendu d'une caméra), à annuler avec restoreStates. */
   applyStates(states: Uint8Array): void {
-    this.saved = this.tubes.map((t) => t.material.emissiveColor.clone());
+    this.saved = this.colors.slice();
     this.tubes.forEach((t, i) => {
       const st = states[i] ?? 0;
       const base = st === 2 ? ORANGE : t.fixture.cold ? COLD : WHITE;
-      const level = st === 1 ? 0.35 + 0.6 * this.rng.next() : 1;
-      t.material.emissiveColor.copyFromFloats(base.r * level, base.g * level, base.b * level);
+      this.setColor(i, base, st === 1 ? 0.35 + 0.6 * this.rng.next() : 1);
     });
+    this.mesh.thinInstanceBufferUpdated("color");
   }
 
   restoreStates(): void {
     if (!this.saved) return;
-    this.tubes.forEach((t, i) => t.material.emissiveColor.copyFrom(this.saved![i]));
+    this.colors.set(this.saved);
     this.saved = null;
+    this.mesh.thinInstanceBufferUpdated("color");
   }
 
   /** Couleur et intensité à donner à une vraie lumière placée sous ce néon. */
@@ -106,7 +131,8 @@ export class NeonSystem {
 
   update(dt: number, threat: Threat | null, listener: { x: number; z: number }): void {
     const c = CONFIG.neons;
-    for (const t of this.tubes) {
+    for (let i = 0; i < this.tubes.length; i++) {
+      const t = this.tubes[i];
       t.forcedFlicker = Math.max(0, t.forcedFlicker - dt);
       t.crackleCooldown -= dt;
       let state: NeonState = "white";
@@ -143,9 +169,9 @@ export class NeonSystem {
         }
       }
 
-      const base = state === "orange" ? ORANGE : t.fixture.cold ? COLD : WHITE;
-      t.material.emissiveColor.copyFromFloats(base.r * t.level, base.g * t.level, base.b * t.level);
+      this.setColor(i, state === "orange" ? ORANGE : t.fixture.cold ? COLD : WHITE, t.level);
     }
+    this.mesh.thinInstanceBufferUpdated("color");
   }
 }
 

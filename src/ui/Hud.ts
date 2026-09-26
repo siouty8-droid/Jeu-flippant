@@ -7,6 +7,7 @@ export class Hud {
   private readonly watch: HTMLDivElement;
   private readonly subtitle: HTMLDivElement;
   private readonly prompt: HTMLDivElement;
+  private readonly crosshair: HTMLDivElement;
   private subtitleTimer = 0;
 
   constructor(parent: HTMLElement) {
@@ -14,8 +15,8 @@ export class Hud {
     this.watch = el("div", "hud-watch");
     this.subtitle = el("div", "hud-subtitle");
     this.prompt = el("div", "hud-prompt");
-    const crosshair = el("div", "hud-crosshair");
-    this.root.append(crosshair, this.watch, this.subtitle, this.prompt);
+    this.crosshair = el("div", "hud-crosshair");
+    this.root.append(this.crosshair, this.watch, this.subtitle, this.prompt);
     parent.append(this.root);
     this.setVisible(false);
   }
@@ -29,14 +30,27 @@ export class Hud {
   }
 
   showSubtitle(text: string, seconds = 4): void {
-    this.subtitle.textContent = text;
-    this.subtitle.classList.add("visible");
+    this.showLine(null, text, "info", seconds);
+  }
+
+  /** Réplique sous-titrée. `kind` : talkie (grésille), direct (à côté de toi), inner (pensée), info. */
+  showLine(speaker: string | null, text: string, kind: "talkie" | "direct" | "inner" | "info", seconds: number): void {
+    this.subtitle.replaceChildren();
+    this.subtitle.className = `hud-subtitle visible ${kind}`;
+    if (speaker) this.subtitle.append(el("span", "speaker", speaker));
+    this.subtitle.append(el("span", "line", text));
     this.subtitleTimer = seconds;
   }
 
+  /** Le viseur grossit quand on vise un objet. */
+  setAiming(on: boolean): void {
+    this.crosshair.classList.toggle("aim", on);
+  }
+
   setPrompt(text: string | null): void {
-    this.prompt.textContent = text ?? "";
+    if (this.prompt.textContent !== (text ?? "")) this.prompt.textContent = text ?? "";
     this.prompt.classList.toggle("visible", !!text);
+    this.setAiming(!!text);
   }
 
   update(dt: number): void {

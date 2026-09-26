@@ -19,7 +19,9 @@ import { activeEvent } from "../narrative/ReplayEvents";
 import type { NeonSystem } from "../systems/NeonSystem";
 import { cameraDelay, type ReplayBuffer, type Snapshot } from "../systems/ReplayBuffer";
 import { CCTV_ONLY_LAYER, buildFaridModel } from "./FaridModel";
+import type { Figure } from "./Figure";
 import { mat } from "./Materials";
+import { consolidate } from "./Merge";
 import type { ShopperModel } from "./ShopperModel";
 import type { World } from "./WorldBuilder";
 
@@ -101,7 +103,9 @@ interface Feed {
  */
 export class SecurityCameras {
   private readonly feeds: Feed[] = [];
-  private readonly farid: TransformNode;
+  private readonly farid: Figure;
+  private liveActors: { x: number; z: number; yaw: number; y: number; enabled: boolean }[] = [];
+  private frame = 0;
   private readonly zoomPlane: Mesh;
   private readonly excluded = new Set<AbstractMesh>();
   private roundRobin = 0;
@@ -119,12 +123,15 @@ export class SecurityCameras {
     private readonly shopper: ShopperModel,
     private readonly replay: ReplayBuffer,
     private readonly playerCamera: UniversalCamera,
+    /** Personnages secondaires rejoués (Sabine, clients). */
+    private readonly actors: Map<string, Figure>,
   ) {
     this.farid = buildFaridModel(scene);
     const c = CONFIG.cameras;
     const bodyMat = mat(scene, "camera-boitier", "#d8d8d4", { specular: 0.3 });
     const ledMat = mat(scene, "camera-led", "#000000", { emissive: "#ff2020" });
     ledMat.disableLighting = true;
+    const housings = new TransformNode("boitiers-cameras", scene);
 
     CAMERAS.forEach((def, k) => {
       const camera = new FreeCamera(`cctv-${k}`, new Vector3(...def.pos), scene);
@@ -163,19 +170,27 @@ export class SecurityCameras {
 
       const monitor = world.monitors[k < 3 ? 3 + k : k - 3];
       monitor.material = material;
+      // Un écran ne doit jamais être rendu dans une caméra : il affiche lui-même une caméra
+      // (boucle de rétroaction WebGL : erreurs et travail GPU pour rien).
+      for (const m of world.monitors) this.excluded.add(m);
 
       // Le boîtier de la caméra, avec sa petite LED rouge.
       const housing = MeshBuilder.CreateBox(`boitier-${k}`, { width: 0.16, height: 0.14, depth: 0.32 }, scene);
       housing.position.copyFrom(camera.position);
       housing.lookAt(new Vector3(...def.target));
       housing.material = bodyMat;
+      housing.parent = housings;
       const led = MeshBuilder.CreateSphere(`led-${k}`, { diameter: 0.025 }, scene);
       led.parent = housing;
       led.position.set(0.05, 0.05, 0.16);
       led.material = ledMat;
-      this.excluded.add(housing);
-      this.excluded.add(led);
+      // Rattachée au groupe (et plus au boîtier) en gardant sa place, pour pouvoir tout fusionner.
+      housing.computeWorldMatrix(true);
+      led.setParent(housings);
     });
+    // Boîtiers et LED fusionnés (2 draw calls au lieu de 12), exclus du rendu des caméras.
+    consolidate(housings);
+    for (const m of housings.getChildMeshes()) this.excluded.add(m);
 
     // Vue plein écran d'une caméra (E sur un écran).
     this.zoomPlane = MeshBuilder.CreatePlane("cctv-zoom", { width: 1, height: 1 }, scene);
@@ -211,6 +226,11 @@ export class SecurityCameras {
     this.zoomPlane.setEnabled(false);
   }
 
+  /** Pendant le chargement, on affiche tout pour compiler les shaders (pas d'à-coup plus tard). */
+  prewarm(on: boolean): void {
+    this.farid.setEnabled(on);
+  }
+
   reset(): void {
     this.unzoom();
     this.witnessed.clear();
@@ -241,9 +261,14 @@ export class SecurityCameras {
       }
     });
     if (render) {
-      // Une caméra par frame à tour de rôle, plus la caméra zoomée à chaque frame.
-      this.roundRobin = (this.roundRobin + 1) % this.feeds.length;
-      const targets = new Set([this.roundRobin]);
+      // Une caméra toutes les deux frames à tour de rôle (≈ 5 images/s par écran à 60 fps,
+      // c'est de la vidéosurveillance), plus la caméra zoomée à chaque frame.
+      this.frame++;
+      const targets = new Set<number>();
+      if (this.frame % 2 === 0) {
+        this.roundRobin = (this.roundRobin + 1) % this.feeds.length;
+        targets.add(this.roundRobin);
+      }
       if (this.zoomed !== null) targets.add(this.zoomed);
       for (const k of targets) if (this.feeds[k].snapshot) this.feeds[k].rtt.resetRefreshCounter();
     }
@@ -312,10 +337,21 @@ export class SecurityCameras {
     live.refreshMatrices();
 
     this.farid.setEnabled(true);
-    this.farid.position.set(s.player.x, 0, s.player.z);
-    this.farid.rotation.y = s.player.yaw;
-    this.farid.computeWorldMatrix(true);
-    for (const m of this.farid.getChildMeshes()) m.computeWorldMatrix(true);
+    this.farid.update(0, s.player.x, s.player.z, s.player.yaw, 0);
+    this.farid.refreshMatrices();
+
+    this.liveActors = [];
+    for (const [id, fig] of this.actors) {
+      const r = fig.root;
+      this.liveActors.push({ x: r.position.x, z: r.position.z, y: r.position.y, yaw: r.rotation.y, enabled: fig.enabled });
+      const a = s.actors.find((x) => x.id === id);
+      fig.setEnabled(!!a?.on);
+      if (a?.on) {
+        r.position.set(a.x, a.sitting ? -0.38 : 0, a.z);
+        r.rotation.y = a.yaw;
+      }
+      fig.refreshMatrices();
+    }
 
     this.neons.applyStates(s.neons);
   }
@@ -330,6 +366,15 @@ export class SecurityCameras {
     live.setEnabled(this.liveShopper.enabled);
     live.refreshMatrices();
     this.farid.setEnabled(false);
+    let i = 0;
+    for (const fig of this.actors.values()) {
+      const l = this.liveActors[i++];
+      if (!l) break;
+      fig.root.position.set(l.x, l.y, l.z);
+      fig.root.rotation.y = l.yaw;
+      fig.setEnabled(l.enabled);
+      fig.refreshMatrices();
+    }
     this.neons.restoreStates();
   }
 

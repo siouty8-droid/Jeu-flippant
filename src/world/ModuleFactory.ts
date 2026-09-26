@@ -2,6 +2,7 @@ import { Color4, Matrix, Mesh, MeshBuilder, Quaternion, Scene, StandardMaterial,
 import { Rng } from "../core/Rng";
 import type { Materials } from "./Materials";
 import { mat, textTexture } from "./Materials";
+import { consolidate } from "./Merge";
 import { HALLOWEEN_MODULE, RAYON_9, STORE, type Box3, type FixtureStyle, type ModuleDef } from "./StoreLayout";
 
 /**
@@ -83,6 +84,7 @@ export class ModuleFactory {
 
     products.finish(root);
     if (def.id !== HALLOWEEN_MODULE) this.signs(def, root);
+    consolidate(root);
     return { def, root, localBoxes };
   }
 
@@ -185,6 +187,8 @@ export class ModuleFactory {
     register.position.set(x - 0.2, 1.01, GONDOLA_LENGTH / 2 - 0.3);
     register.material = this.mats.darkPlastic;
     register.parent = root;
+    // Objet interactif plus tard (le double de clé est dedans) : on ne le fusionne pas.
+    register.metadata = { keep: true };
     const screen = MeshBuilder.CreateBox("ecran-caisse-boucherie", { width: 0.25, height: 0.14, depth: 0.02 }, this.scene);
     screen.position.set(x - 0.2, 1.2, GONDOLA_LENGTH / 2 - 0.42);
     screen.rotation.x = -0.35;
@@ -281,6 +285,7 @@ export class ModuleFactory {
     m.emissiveColor.set(0.35, 0.35, 0.35);
 
     const z = STORE.cellDepth / 2 + 0.1;
+    const wires: Mesh[] = [];
     for (const end of [-1, 1]) {
       const sign = MeshBuilder.CreatePlane(`panneau-${def.id}`, { width: 2.4, height: 0.6 }, this.scene);
       sign.position.set(0, 3.1, end * z);
@@ -289,12 +294,16 @@ export class ModuleFactory {
       sign.material = m;
       sign.parent = root;
       for (const dx of [-1, 1]) {
-        const wire = MeshBuilder.CreateCylinder("fil", { diameter: 0.01, height: STORE.height - 3.4 }, this.scene);
+        const wire = MeshBuilder.CreateBox("fil", { width: 0.012, height: STORE.height - 3.4, depth: 0.012 }, this.scene);
         wire.position.set(dx * 1.0, 3.4 + (STORE.height - 3.4) / 2, end * z);
-        wire.material = this.mats.darkPlastic;
-        wire.parent = root;
+        wires.push(wire);
       }
     }
+    // Les quatre fils en un seul mesh.
+    const merged = Mesh.MergeMeshes(wires, true)!;
+    merged.material = this.mats.darkPlastic;
+    merged.parent = root;
+    merged.isPickable = false;
   }
 }
 

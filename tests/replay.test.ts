@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ReplayBuffer, cameraDelay, type Snapshot } from "../src/systems/ReplayBuffer";
 
 function snap(t: number, x = t): Snapshot {
-  return { t, assignment: [1, 2, 3], player: { x, z: 0, yaw: 0 }, shopper: null, neons: new Uint8Array(2) };
+  return { t, assignment: [1, 2, 3], player: { x, z: 0, yaw: 0 }, shopper: null, neons: new Uint8Array(2), actors: [] };
 }
 
 describe("cameraDelay", () => {

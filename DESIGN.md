@@ -67,6 +67,49 @@ Deux règles d'or, toute violation est un bug bloquant :
 - **Interaction** : `E` sur un écran pour le plein écran, `←`/`→` (ou Q/D) pour changer de caméra, `E`/`Tab`/`Échap` pour revenir. Pendant le zoom on ne marche pas, donc on stagne. C'est voulu.
 - **Événements injectés** (`narrative/ReplayEvents.ts`) : ils modifient l'instantané pour une seule caméra. Le premier : entre 03:18 et 03:23 (heure rejouée), le client est planté devant la CAM 2 et fixe l'objectif, tête relevée. C'est la seule exception à la règle du visage, et elle est voulue : c'est un indice de la fin cachée. On ne voit pas de visage de toute façon, la tête est lisse. Si le joueur le regarde (zoom, ou devant le bureau face à l'écran), `client-objectif` est ajouté à `game.story`, qui survit aux boucles.
 
+## Règle 5 et portes (étape 5)
+
+- `world/Doors.ts` : chaque porte a son gond (TransformNode), un panneau animé (0,4 s), une clé du trousseau et un sens d'ouverture. Une porte fermée bloque la vue et le passage du client (volume dynamique dans l'`OcclusionMap`).
+- **Trousseau** (dans la pause) : clés du poste de sécurité, du local technique, des sorties de secours et de la chambre froide. Au début de la nuit, le poste de sécurité et la double porte de la réserve sont ouverts. Le local technique et les sorties de secours sont fermés à clé.
+- **Sécurité** : on ne peut pas ouvrir une porte qui s'ouvre vers soi, ni en fermer une quand on est dans l'encadrement.
+- **Règle 5** : une sortie de secours ouverte se referme et se **reverrouille** après 4 s sans être regardée (champ de vision + ligne de vue). On entend une clenche retomber au loin.
+- **On ne sort pas** : franchir une sortie de secours ouverte te fait réapparaître à l'intérieur, devant la sortie suivante (ouest → est → réserve), grande ouverte dans ton dos. Elle se referme dès que tu ne la regardes plus. La seule vraie sortie reste l'entrée, gardée par un mur invisible jusqu'aux fins (étape 8). Farid refuse de partir : « Je peux pas partir sans Sabine. »
+- **Chambre froide** : à 01:10, la porte claque et une targette neuve apparaît côté réserve. Aucune clé du trousseau ne marche. Le double (caisse de la boucherie) et la serrure qui change arrivent à l'étape 8.
+
+## Narration (étape 6)
+
+- `systems/Npcs.ts` : Sabine est assise derrière la caisse 1. Deux clients insomniaques (le monsieur à la banane, une étudiante en sweat) se promènent d'un rayon à l'autre, puis sortent vers 00:38 et 00:52. Tous sont rejoués sur les caméras.
+- `narrative/Narrative.ts` : la timeline, avec des événements déclenchés une seule fois par nuit.
+  - **00:00** : Sabine t'accueille au talkie. Elle te charrie quand tu passes à sa caisse.
+  - **01:05** : elle part en chambre froide (elle traverse le magasin et ouvre les portes).
+  - **01:10** : la porte claque, mais **seulement quand personne ne la regarde et que le joueur n'est pas dedans**. Puis vient l'appel paniqué.
+  - Ensuite : indice sur les rayons qui bougent, réaction au premier client aperçu, les pas en rond dans le local technique (02:30, sons spatialisés), le rayon 9, le froid (04:00).
+  - **Chuchotements** : quand le client s'arrête à moins de 15 m, elle chuchote.
+  - **Porte de la chambre froide** : elle frappe à la porte quand tu es juste derrière.
+- **Température** : 100 → 0. Elle perd 16 par heure jusqu'à 04:00, puis 30 par heure, donc un silence radio vers 05:50 si personne ne la sort. La voix se dégrade avec le froid : texte abîmé (mots perdus, « … »), volume, coupures, filtre plus sourd.
+- **Talkie** (`narrative/Talkie.ts`) : une réplique à la fois, sous-titrée avec le nom de la personne qui parle. Il y a trois types de répliques : talkie (grésillement et voix filtrée), en direct (voix spatialisée) et pensée (italique). La voix est synthétisée en Web Audio, avec des syllabes, des formants et un filtre radio.
+- **Touche T** : Farid appelle Sabine, qui répond selon la situation. C'est le système d'indices : danger immédiat, photo du plan, chemin de la réserve, porte verrouillée…
+- **06:00** : pour l'instant, un écran d'aube (sauvée ou non) puis retour au titre. Les vraies fins arrivent à l'étape 8.
+
+## Performance (passe de l'étape 5/6)
+
+Mesures (logique du jeu hors rendu, par frame) : **1,73 ms → 0,27 ms**. Draw calls : **181 → 108** à l'entrée, **107 → 71** dans une allée.
+
+- Rendu à la résolution CSS (plus d'adaptation au ratio de pixels, qui quadruplait le coût sur écran Retina), plus une **résolution adaptative** calme : baisse si < 48 fps pendant 3 s, remonte après 12 s de marge, jamais plus d'un changement par 6 s (un changement réalloue le post-traitement).
+- **Réglage de qualité** (basse / moyenne / haute) : MSAA, bloom, plage de résolution. Grain et aberration désactivables. Sensibilité, volume et champ de vision sont réglables, et tout est gardé dans le navigateur.
+- Les **37 néons** sont un seul mesh à instances fines (une couleur par tube).
+- `world/Merge.ts` fusionne les meshes statiques par matériau : rayons, silhouettes (sauf les jambes), poignées, caddies garés, boîtiers de caméras.
+- La visée (`E`) ne teste plus que les objets interactifs, et les murs via l'occlusion (avant : tous les meshes, 10 fois par seconde).
+- La visibilité des rayons n'est calculée que si quelque chose peut bouger.
+- L'éclairage ne crée plus d'objets à chaque frame, et le debug ne calcule rien quand il est fermé.
+- **Pré-compilation** au chargement : client, rayon 9, silhouette de Farid et verrou sont affichés le temps de compiler leurs shaders, ce qui évite un à-coup à leur première apparition.
+- **Bug corrigé** : les écrans du poste étaient rendus dans les caméras qu'ils affichent (boucle de rétroaction WebGL, erreurs et travail GPU pour rien).
+- **Autres bugs corrigés** :
+  - Le client pouvait traverser un mur en visant un point hors du graphe.
+  - Un rayon pouvait être réagencé sous les pieds du client ou d'un PNJ.
+  - Après une boucle sans pointer lock, le jeu reprenait sans souris : il passe maintenant par la pause.
+  - Le HUD passait à travers le menu pause.
+
 ## Rendu
 
 - Babylon.js 9, WebGL2. Hémisphérique faible + **pool de 4 PointLight** qui se collent aux néons les plus proches. Leur intensité décroît vers le bord du pool pour éviter les « pops ».
@@ -80,8 +123,8 @@ Deux règles d'or, toute violation est un bug bloquant :
 - [x] **Étape 2 — Règle 1 + plan** : `OcclusionMap`, `DwellTracker` (ancrage + stagnation), `ReshuffleSystem` (détour, stagnation, rayon 9), interaction `E`, photo du plan dans le téléphone (`Tab`), debug enrichi (heatmap d'ancrage, timer de stagnation, `R` pour forcer un échange), tests Vitest.
 - [x] **Étape 3 — Néons + client + boucle** : `NavGraph`, `ShopperBrain` / `ShopperModel` / `ShopperAI`, `NeonSystem`, `NoiseSystem`, audio procédural, boucle à 00:00, debug (état du client sur la mini-carte, `J` pour le mettre à l'arrêt devant soi).
 - [x] **Étape 4 — Caméras en différé** : `ReplayBuffer`, `SecurityCameras` (6 flux, shader vidéosurveillance, zoom), silhouette de Farid visible seulement par les caméras, événements injectés (`client-objectif`), debug (décalage, début de l'enregistrement, découvertes).
-- [ ] Étape 5 — Portes, clés, règle 5
-- [ ] Étape 6 — Narration, Sabine, talkie
+- [x] **Étape 5 — Portes, clés, règle 5** : `DoorSystem`, trousseau, sorties de secours qui se reverrouillent et qui te renvoient dans le magasin, verrou de la chambre froide.
+- [x] **Étape 6 — Narration** : Sabine et les clients du début de nuit (`Npcs`), timeline (`Narrative`), talkie avec voix synthétique, touche T (indices), température, pas dans le local technique, écran d'aube provisoire. Plus la passe perf et bugs ci-dessus.
 - [ ] Étape 7 — Radio du magasin
 - [ ] Étape 8 — Énigmes, portage, fins
 - [ ] Étape 9 — Polish
