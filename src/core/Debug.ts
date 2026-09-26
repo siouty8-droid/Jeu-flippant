@@ -12,11 +12,20 @@ export interface DebugInfo {
   zone: string;
   speed: number;
   running: boolean;
+  stagnation: number;
+  stagnationThreshold: number;
+  /** Ancrage (0..1) du module présent dans chaque slot, dans l'ordre des slots. */
+  anchors: { id: number; anchor: number }[];
+  unstable: number[];
+  swaps: number;
+  lastCause: string | null;
+  active: boolean;
 }
 
 /**
  * Overlay de debug (F1) : infos, mini-carte, raccourcis.
- * Avec l'overlay ouvert : [ et ] reculent / avancent l'horloge de 15 min.
+ * Avec l'overlay ouvert : [ et ] reculent / avancent l'horloge de 15 min,
+ * R force un échange de deux slots cachés.
  */
 export class Debug {
   private readonly root: HTMLDivElement;
@@ -61,12 +70,19 @@ export class Debug {
       `position   x ${info.x.toFixed(1)}  z ${info.z.toFixed(1)}`,
       `zone       ${info.zone}`,
       `vitesse    ${info.speed.toFixed(2)} m/s${info.running ? "  (course)" : ""}`,
+      ``,
+      `magasin    ${info.active ? "INSTABLE" : "normal (avant 01:10)"}   R : forcer un échange`,
+      `stagnation ${info.stagnation.toFixed(1)} / ${info.stagnationThreshold.toFixed(1)} s`,
+      `échanges   ${info.swaps}${info.lastCause ? `  (dernier : ${info.lastCause})` : ""}`,
+      `instables  ${info.unstable.length ? info.unstable.map((s) => `slot ${s}`).join(", ") : "-"}`,
+      `ancrage    ${info.anchors.map((a) => `${a.id === 0 ? "H" : a.id}:${Math.round(a.anchor * 100)}%`).join(" ")}`,
     ].join("\n");
     drawPlan(this.ctx, this.map.width, this.map.height, this.layout, {
       assignment: this.layout.assignment,
       theme: "debug",
       showHidden: true,
       player: { x: info.x, z: info.z, yaw: info.yaw },
+      heat: info.anchors.map((a) => a.anchor),
     });
   }
 }

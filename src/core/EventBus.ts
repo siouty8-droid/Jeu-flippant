@@ -7,6 +7,8 @@ export interface GameEvents {
   "clock:dawn": Record<string, never>;
   "zone:enter": { zoneId: string; previousZoneId: string | null };
   "debug:toggle": { visible: boolean };
+  "store:reshuffle": { slots: number[]; cause: "detour" | "stagnation" | "rayon9" | "debug" };
+  "plan:photo": { minutes: number };
 }
 
 type Handler<T> = (payload: T) => void;

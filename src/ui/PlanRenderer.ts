@@ -10,6 +10,8 @@ export interface PlanOptions {
   player?: { x: number; z: number; yaw: number };
   /** Dessiner aussi ce qui n'est pas censé figurer sur le plan (rayon 9, présentoir). */
   showHidden?: boolean;
+  /** Heatmap d'ancrage (0..1) par slot, pour le debug. */
+  heat?: readonly number[];
 }
 
 interface Frame {
@@ -73,6 +75,10 @@ export function drawPlan(ctx: CanvasRenderingContext2D, w: number, h: number, la
     const y = Y(slot.z1);
     const sw = (slot.x1 - slot.x0) * f.scale;
     const sh = (slot.z1 - slot.z0) * f.scale;
+    if (opts.heat) {
+      ctx.fillStyle = `rgba(255, 170, 40, ${0.08 + opts.heat[slot.index] * 0.5})`;
+      ctx.fillRect(x, y, sw, sh);
+    }
     if (id === HALLOWEEN_MODULE) {
       ctx.strokeStyle = poster ? "#c96a1c" : "#e8741c";
       ctx.setLineDash([4, 4]);

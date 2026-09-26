@@ -2,7 +2,7 @@ import { Color4, Matrix, Mesh, MeshBuilder, Quaternion, Scene, StandardMaterial,
 import { Rng } from "../core/Rng";
 import type { Materials } from "./Materials";
 import { mat, textTexture } from "./Materials";
-import { HALLOWEEN_MODULE, RAYON_9, STORE, type FixtureStyle, type ModuleDef } from "./StoreLayout";
+import { HALLOWEEN_MODULE, RAYON_9, STORE, type Box3, type FixtureStyle, type ModuleDef } from "./StoreLayout";
 
 /**
  * Construit un module (un rayon) en coordonnées locales, centré sur l'origine.
@@ -14,6 +14,7 @@ import { HALLOWEEN_MODULE, RAYON_9, STORE, type FixtureStyle, type ModuleDef } f
 const GONDOLA_X = 2.4;
 const GONDOLA_DEPTH = 1.2;
 const GONDOLA_LENGTH = 8;
+const FRIDGE_HEIGHT = 2.2;
 
 interface StyleParams {
   height: number;
@@ -34,8 +35,11 @@ const STYLE_PARAMS: Record<Exclude<FixtureStyle, "fridge" | "display">, StylePar
 export interface ModuleInstance {
   def: ModuleDef;
   root: TransformNode;
-  /** Meshes qui bloquent la vue (gondoles) : utiles pour les tests d'occlusion. */
-  occluders: Mesh[];
+  /**
+   * Volumes opaques du module en coordonnées locales (gondoles, frigos, comptoirs).
+   * L'OcclusionMap s'en sert pour savoir ce que le joueur peut voir.
+   */
+  localBoxes: Box3[];
 }
 
 export class ModuleFactory {
@@ -48,27 +52,38 @@ export class ModuleFactory {
   build(def: ModuleDef): ModuleInstance {
     const root = new TransformNode(`module-${def.id}`, this.scene);
     const rng = this.rng.fork(`module-${def.id}`);
-    const occluders: Mesh[] = [];
+    const localBoxes: Box3[] = [];
     const products = new ProductBatch(`produits-${def.id}`, this.scene, this.mats.product);
+    const block = (x: number, height: number, halfW = GONDOLA_DEPTH / 2, halfL = GONDOLA_LENGTH / 2, z = 0) =>
+      localBoxes.push({ minX: x - halfW, maxX: x + halfW, minY: 0, maxY: height, minZ: z - halfL, maxZ: z + halfL });
 
     switch (def.style) {
       case "fridge":
-        for (const side of [-1, 1]) occluders.push(this.fridge(def, root, side * GONDOLA_X));
+        for (const side of [-1, 1]) {
+          this.fridge(def, root, side * GONDOLA_X);
+          block(side * GONDOLA_X, FRIDGE_HEIGHT);
+        }
         break;
       case "display":
         this.halloweenDisplay(root, rng);
+        for (const z of [-2.2, 2.2]) block(0, 0.7, 0.55, 0.45, z);
         break;
       case "butcher":
-        occluders.push(this.gondola(def, root, -GONDOLA_X, STYLE_PARAMS.butcher, rng, products));
+        this.gondola(def, root, -GONDOLA_X, STYLE_PARAMS.butcher, rng, products);
+        block(-GONDOLA_X, STYLE_PARAMS.butcher.height);
         this.butcherCounter(def, root, GONDOLA_X, rng, products);
+        block(GONDOLA_X, 0.9);
         break;
       default:
-        for (const side of [-1, 1]) occluders.push(this.gondola(def, root, side * GONDOLA_X, STYLE_PARAMS[def.style], rng, products));
+        for (const side of [-1, 1]) {
+          this.gondola(def, root, side * GONDOLA_X, STYLE_PARAMS[def.style], rng, products);
+          block(side * GONDOLA_X, STYLE_PARAMS[def.style].height);
+        }
     }
 
     products.finish(root);
     if (def.id !== HALLOWEEN_MODULE) this.signs(def, root);
-    return { def, root, occluders };
+    return { def, root, localBoxes };
   }
 
   /** Gondole double face : plinthe, dos central, tablettes, joues, produits des deux côtés. */
@@ -124,7 +139,7 @@ export class ModuleFactory {
 
   /** Surgelés : armoires à portes vitrées lumineuses, double face. */
   private fridge(def: ModuleDef, root: TransformNode, x: number): Mesh {
-    const h = 2.2;
+    const h = FRIDGE_HEIGHT;
     const body = MeshBuilder.CreateBox(`frigo-${def.id}`, { width: GONDOLA_DEPTH, height: h, depth: GONDOLA_LENGTH }, this.scene);
     body.position.set(x, h / 2, 0);
     body.material = this.mats.fridgeBody;

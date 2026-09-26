@@ -46,6 +46,7 @@ function controls(): HTMLElement {
     ["Maj", "courir (ça s'entend)"],
     ["Souris", "regarder"],
     ["E", "interagir"],
+    ["Tab", "téléphone"],
     ["Échap", "pause"],
   ];
   for (const [k, v] of rows) {

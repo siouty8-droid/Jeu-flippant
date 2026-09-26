@@ -85,6 +85,48 @@ export interface Wall {
   openings: Opening[];
 }
 
+/** Boîte alignée sur les axes, en coordonnées monde (ou locales pour un module). */
+export interface Box3 {
+  minX: number;
+  minY: number;
+  minZ: number;
+  maxX: number;
+  maxY: number;
+  maxZ: number;
+}
+
+export interface WallPiece extends Box3 {
+  glass: boolean;
+}
+
+/** Découpe un mur en blocs pleins (et vitres) autour de ses ouvertures. Sert à la 3D et à l'occlusion. */
+export function wallPieces(wall: Wall): WallPiece[] {
+  const H = STORE.height;
+  const t = STORE.wallThickness / 2;
+  const alongX = wall.z0 === wall.z1;
+  const start = alongX ? wall.x0 : wall.z0;
+  const end = alongX ? wall.x1 : wall.z1;
+  const out: WallPiece[] = [];
+  const piece = (a: number, b: number, y0: number, y1: number, glass = false) => {
+    if (b - a <= 0.001 || y1 - y0 <= 0.001) return;
+    out.push(
+      alongX
+        ? { minX: a, maxX: b, minY: y0, maxY: y1, minZ: wall.z0 - t, maxZ: wall.z0 + t, glass }
+        : { minX: wall.x0 - t, maxX: wall.x0 + t, minY: y0, maxY: y1, minZ: a, maxZ: b, glass },
+    );
+  };
+  let cursor = start;
+  for (const o of [...wall.openings].sort((a, b) => a.from - b.from)) {
+    piece(cursor, o.from, 0, H);
+    piece(o.from, o.to, 0, o.bottom);
+    piece(o.from, o.to, o.top, H);
+    if (o.glass) piece(o.from, o.to, o.bottom, o.top, true);
+    cursor = o.to;
+  }
+  piece(cursor, end, 0, H);
+  return out;
+}
+
 export type DoorKind = "emergency" | "room" | "entrance";
 
 export interface DoorDef {
@@ -133,6 +175,8 @@ export class StoreLayout {
   readonly initialAssignment: readonly number[] = INITIAL_ASSIGNMENT;
   /** Quel module est dans quel slot en ce moment. */
   assignment: number[] = [...INITIAL_ASSIGNMENT];
+  /** Heure de jeu (minutes) du dernier changement de contenu de chaque slot, -1 si jamais. */
+  readonly slotChangedAt: number[] = INITIAL_ASSIGNMENT.map(() => -1);
 
   constructor() {
     for (let row = 0; row < STORE.rowZ.length; row++) {
@@ -216,6 +260,10 @@ export class StoreLayout {
       if (Math.abs(other.row - s.row) + Math.abs(other.col - s.col) === 1) out.push(other.index);
     }
     return out;
+  }
+
+  slotOfModule(moduleId: number): number {
+    return this.assignment.indexOf(moduleId);
   }
 
   moduleInSlot(slotIndex: number): ModuleDef {

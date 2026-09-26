@@ -4,7 +4,7 @@ import { drawPlan } from "../ui/PlanRenderer";
 import { createMaterials, mat, textTexture, type Materials } from "./Materials";
 import { ModuleFactory, type ModuleInstance } from "./ModuleFactory";
 import { buildCart } from "./Props";
-import { MODULES, STORE, type StoreLayout, type Wall, type WallMaterial } from "./StoreLayout";
+import { MODULES, STORE, wallPieces, type StoreLayout, type Wall, type WallMaterial } from "./StoreLayout";
 
 /** Un néon au plafond. Le NeonSystem (règle 3) pilotera sa couleur ; ici on le pose. */
 export interface NeonFixture {
@@ -21,6 +21,8 @@ export interface World {
   neons: NeonFixture[];
   /** Écrans du poste de sécurité (règle 2, étape 4). */
   monitors: Mesh[];
+  /** Le plan d'évacuation mural (interactif : photo). */
+  planPanel: Mesh;
   /** Place chaque module dans le slot que lui donne layout.assignment. */
   placeModules(): void;
 }
@@ -46,7 +48,7 @@ export function buildWorld(scene: Scene, layout: StoreLayout, rng: Rng): World {
   b.securityPost();
   b.backRooms(rng.fork("arriere"));
   b.outside();
-  b.evacuationPlan();
+  const planPanel = b.evacuationPlan();
   const neons = b.neons();
 
   const factory = new ModuleFactory(scene, mats, rng.fork("modules"));
@@ -70,7 +72,7 @@ export function buildWorld(scene: Scene, layout: StoreLayout, rng: Rng): World {
   };
   placeModules();
 
-  return { mats, modules, neons, monitors: b.monitors, placeModules };
+  return { mats, modules, neons, monitors: b.monitors, planPanel, placeModules };
 }
 
 class Builder {
@@ -131,38 +133,23 @@ class Builder {
       cold: this.mats.wallCold,
       office: this.mats.wallOffice,
     };
-    const m = matFor[wall.material];
-    const H = STORE.height;
-    const t = STORE.wallThickness;
-    const alongX = wall.z0 === wall.z1;
-    const start = alongX ? wall.x0 : wall.z0;
-    const end = alongX ? wall.x1 : wall.z1;
-    const piece = (a: number, b: number, y0: number, y1: number, material = m, collide = true) => {
-      if (b - a <= 0.001 || y1 - y0 <= 0.001) return;
-      const len = b - a;
-      const mid = (a + b) / 2;
-      const w = alongX ? len : t;
-      const d = alongX ? t : len;
-      const x = alongX ? mid : wall.x0;
-      const z = alongX ? wall.z0 : mid;
-      if (material === this.mats.glass) {
-        const g = this.box(material, alongX ? len : 0.03, y1 - y0, alongX ? 0.03 : len, x, (y0 + y1) / 2, z, collide);
+    for (const p of wallPieces(wall)) {
+      const w = p.maxX - p.minX;
+      const h = p.maxY - p.minY;
+      const d = p.maxZ - p.minZ;
+      const x = (p.minX + p.maxX) / 2;
+      const y = (p.minY + p.maxY) / 2;
+      const z = (p.minZ + p.maxZ) / 2;
+      if (p.glass) {
+        const alongX = w > d;
+        const g = this.box(this.mats.glass, alongX ? w : 0.03, h, alongX ? 0.03 : d, x, y, z, true);
         g.isPickable = false;
       } else {
-        this.staticBox(material, w, y1 - y0, d, x, (y0 + y1) / 2, z, collide);
+        this.staticBox(matFor[wall.material], w, h, d, x, y, z, true);
       }
-    };
-    const openings = [...wall.openings].sort((a, b) => a.from - b.from);
-    let cursor = start;
-    for (const o of openings) {
-      piece(cursor, o.from, 0, H);
-      piece(o.from, o.to, 0, o.bottom);
-      piece(o.from, o.to, o.top, H);
-      if (o.glass) piece(o.from, o.to, o.bottom, o.top, this.mats.glass, true);
-      cursor = o.to;
     }
-    piece(cursor, end, 0, H);
   }
+
 
   emergencyDoors(): void {
     const signTex = textTexture(this.scene, "tex-sortie-secours", 512, 128, (ctx, w, h) => {
@@ -371,7 +358,7 @@ class Builder {
     }
   }
 
-  evacuationPlan(): void {
+  evacuationPlan(): Mesh {
     const panel = MeshBuilder.CreatePlane("plan-evacuation", { width: 1.1, height: 1.6 }, this.scene);
     panel.position.set(15.25, 1.55, STORE.wallThickness / 2 + 0.035);
     panel.rotation.y = Math.PI;
@@ -387,6 +374,7 @@ class Builder {
     m.emissiveColor = new Color3(0.12, 0.12, 0.12);
     panel.material = m;
     this.staticBox(this.mats.darkPlastic, 1.18, 1.68, 0.04, 15.25, 1.55, STORE.wallThickness / 2 + 0.01, false);
+    return panel;
   }
 
   /** Pose tous les néons et renvoie leurs positions. À appeler en dernier : il fusionne aussi le statique. */
